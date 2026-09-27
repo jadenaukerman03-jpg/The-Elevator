@@ -1,0 +1,362 @@
+using UnityEngine;
+using TheElevator.Generation;
+
+namespace TheElevator.Office
+{
+    public sealed partial class OfficeKit
+    {
+        public readonly OfficeArt A;
+        public readonly OfficePlan Plan;
+        readonly GeneratedFloor floor;
+        static readonly Vector3[] corners={new Vector3(-3.5f,0,-3.5f),new Vector3(3.5f,0,3.5f),new Vector3(-3.5f,0,3.5f),new Vector3(3.5f,0,-3.5f)};
+        public OfficeKit(Workshop w,GeneratedFloor target)
+        { A=new OfficeArt(w); floor=target; Plan=OfficePlan.Build(target.Manifest); }
+        public void Dress(Transform geometry,MapRoom room,float height)
+        {
+            OfficeRoomPlan info=Plan.Rooms[room.Id];
+            Material departmentAccent=A.DepartmentAccents[info.Department];
+            bool publicArea=info.Kind==OfficeRoomKind.Lobby||info.Kind==OfficeRoomKind.Reception;
+            bool service=info.Kind==OfficeRoomKind.Server||info.Kind==OfficeRoomKind.Maintenance||info.Kind==OfficeRoomKind.Records;
+            foreach(MeshRenderer renderer in geometry.GetComponentsInChildren<MeshRenderer>())
+                if (!renderer.GetComponent<TextMesh>())
+                renderer.sharedMaterial=renderer.name.Contains("Floor")||renderer.name.Contains("landing")||renderer.name.Contains("gallery") ? (publicArea?A.Tile:A.Carpet)
+                    :renderer.name.Contains("stripe")||renderer.name.Contains("frame") ? departmentAccent :renderer.name.Contains("Ceiling")?A.Plaster:A.Plaster;
+            // Complete wall bays: wainscot, skirting, crown, inset panels, outlets and a service rail.
+            for(int side=0;side<4;side++)
+            {
+                Transform wall=A.Group(geometry,"Finished wall bay",Vector3.zero,side*90);
+                for(int sign=-1;sign<=1;sign+=2)
+                {
+                    A.Box(wall,"Walnut wainscot",new Vector3(sign*4.05f,.52f,5.82f),new Vector3(3.65f,.95f,.08f),publicArea?A.Wood:A.Plaster);
+                    A.Box(wall,"Brass skirting",new Vector3(sign*4.05f,.1f,5.74f),new Vector3(3.65f,.18f,.045f),A.Dark);
+                    A.Box(wall,"Wall picture rail",new Vector3(sign*4.05f,1.02f,5.74f),new Vector3(3.65f,.035f,.05f),A.Brass);
+                    A.Box(wall,"Ceiling perimeter trim",new Vector3(sign*4.05f,height-.14f,5.78f),new Vector3(3.65f,.12f,.13f),A.Dark);
+                    A.Box(wall,"Outlet plate",new Vector3(sign*3.1f,.35f,5.71f),new Vector3(.18f,.12f,.035f),A.Plastic);
+                    for(int socket=0;socket<2;socket++) A.Box(wall,"Socket",new Vector3(sign*3.1f-.04f+socket*.08f,.35f,5.687f),new Vector3(.025f,.045f,.012f),A.Dark);
+                    A.Box(wall,"Inset acoustic wall panel",new Vector3(sign*4.3f,2.05f,5.79f),new Vector3(2.65f,1.52f,.04f),service?A.Metal:A.Upholstery);
+                    for(int rib=0;rib<8;rib++) A.Box(wall,"Acoustic rib",new Vector3(sign*4.3f-1.17f+rib*.33f,2.05f,5.745f),new Vector3(.028f,1.48f,.025f),publicArea?A.Brass:A.Dark);
+                }
+                A.Box(wall,"Wayfinding plaque",new Vector3(0,3.06f,5.7f),new Vector3(2.65f,.36f,.075f),A.Dark);
+                A.Label(wall,(room.Id==0?"WELCOME / ":OfficePlan.Departments[info.Department]+" / ")+info.Kind.ToString().ToUpper(),new Vector3(0,3.07f,5.65f),.025f);
+                A.Box(wall,"Access terminal housing",new Vector3(1.68f,1.38f,5.72f),new Vector3(.23f,.38f,.12f),A.Dark);
+                A.Box(wall,"Access status",new Vector3(1.68f,1.46f,5.64f),new Vector3(.15f,.08f,.015f),info.Clearance>0?A.WarmLight:A.Screen);
+                bool opening=room.Has(RoomRole.Entrance)&&side==2;
+                foreach(int next in floor.Manifest.Neighbors(room.Id))
+                {
+                    MapRoom n=floor.Manifest.Rooms[next];if(n.Layer!=room.Layer)continue;
+                    int port=n.X>room.X?1:n.X<room.X?3:n.Z>room.Z?0:2;if(port==side)opening=true;
+                }
+                if(opening&&!(room.Has(RoomRole.Entrance)&&side==2))for(int sign=-1;sign<=1;sign+=2)
+                {
+                    A.Box(wall,"Finished door jamb",new Vector3(sign*1.45f,1.4f,5.73f),new Vector3(.08f,2.8f,.22f),A.Dark);
+                    A.Box(wall,"Pocketed glazed door",new Vector3(sign*2.16f,1.39f,5.68f),new Vector3(1.30f,2.7f,.045f),A.Glass,false,false);
+                    A.Box(wall,"Door pull",new Vector3(sign*1.61f,1.2f,5.59f),new Vector3(.035f,.42f,.035f),A.Brass);
+                }
+            }
+            if(!room.Has(RoomRole.StairUp))
+            {
+                // Recessed ceiling coffers rather than one featureless slab.
+                for(int ix=0;ix<10;ix++) for(int iz=0;iz<10;iz++)
+                {
+                    float x=-5.4f+ix*1.2f,z=-5.4f+iz*1.2f;
+                    A.Box(geometry,"Acoustic ceiling tile",new Vector3(x,height-.04f,z),new Vector3(1.18f,.04f,1.18f),A.Plaster,false,false);
+                    A.Box(geometry,"Ceiling T grid",new Vector3(x-.6f,height-.06f,z),new Vector3(.018f,.02f,1.2f),A.Metal,false,false);
+                }
+                for(int sign=-1;sign<=1;sign+=2)
+                {
+                    A.Box(geometry,"Recessed luminaire",new Vector3(sign*3,height-.14f,0),new Vector3(1.24f,.1f,2.44f),A.Dark);
+                    A.Box(geometry,"Opal light diffuser",new Vector3(sign*3,height-.2f,0),new Vector3(1.1f,.035f,2.3f),publicArea?A.WarmLight:A.CoolLight);
+                    A.W.Lamp(floor.RoomRoots[room.Id],new Vector3(sign*3,height-.45f,0),publicArea?new Color(1,.77f,.48f):service?new Color(.45f,.7f,.82f):new Color(.81f,.9f,.8f),publicArea?2.8f:2.1f,9);
+                    A.Box(geometry,"HVAC grille",new Vector3(sign*4,height-.13f,4),new Vector3(1.3f,.06f,.65f),A.Dark);
+                    for(int slat=0;slat<12;slat++) A.Box(geometry,"Vent louver",new Vector3(sign*4-.56f+slat*.1f,height-.18f,4),new Vector3(.035f,.05f,.57f),A.Metal);
+                }
+                A.Round(geometry,"Smoke detector",new Vector3(0,height-.13f,3),new Vector3(.24f,.045f,.24f),A.Plastic);
+                A.Round(geometry,"Sprinkler",new Vector3(3,height-.23f,3),new Vector3(.1f,.06f,.1f),A.Brass);
+            }
+            if(room.IsStair) return;
+            RoomDetails(geometry,room,info);
+            if(room.Has(RoomRole.Landmark))
+            {
+                Transform landmark=A.Group(geometry,"Landmark / corporate memory",new Vector3(0,height-.8f,0));
+                // Suspended sculpture keeps the extraction cross unobstructed below 2.8 m.
+                A.Round(landmark,"Corporate memory disc",Vector3.zero,new Vector3(1.35f,.045f,1.35f),departmentAccent);
+                for(int i=0;i<4;i++){Transform vane=A.Group(landmark,"Sculpture vane",Vector3.zero,i*90+room.Id%30);A.Box(vane,"Brass memory fin",new Vector3(.55f,.1f,0),new Vector3(.07f,.4f,.8f),A.Brass);}
+                A.Label(geometry,"CORPORATE MEMORY / "+room.Id.ToString("000"),new Vector3(0,3.38f,5.6f),.041f);
+            }
+            // Preserve every generated doorway route and planned content corner.
+            for(int slot=0;slot<4;slot++)
+            {
+                bool reserved=floor.Manifest.Sockets.Exists(s=>s.RoomId==room.Id&&s.Slot==slot);
+                if(reserved || (room.Id==Plan.TargetRoom && slot==1)) continue;
+                Transform cluster=A.Group(geometry,"Office cluster / "+info.Kind+" / "+slot,corners[slot]);
+                switch(info.Kind)
+                {
+                    case OfficeRoomKind.Lobby: if(slot==2) Reception(cluster,room.Id); else Lounge(cluster); break;
+                    case OfficeRoomKind.Reception: if(slot==2) Reception(cluster,room.Id); else if(slot==3) Desk(cluster,room.Id,true); else Lounge(cluster); break;
+                    case OfficeRoomKind.Workroom:
+                        Desk(A.Group(cluster,"Workstation A",new Vector3(-1.13f,0,0)),room.Id,true);
+                        Desk(A.Group(cluster,"Workstation B",new Vector3(1.13f,0,0)),room.Id,true);
+                        break;
+                    case OfficeRoomKind.Executive: Desk(cluster,room.Id,false); if(slot==2) Plant(cluster,new Vector3(1.2f,0,1.1f)); break;
+                    case OfficeRoomKind.Conference: case OfficeRoomKind.Training: Conference(cluster,room.Id); break;
+                    case OfficeRoomKind.Breakroom: Kitchen(cluster,room.Id); break;
+                    case OfficeRoomKind.Server: Server(cluster); Task(cluster,room.Id,OfficeTask.Repair,new Vector3(0,0,-1.35f),false); break;
+                    case OfficeRoomKind.Records: case OfficeRoomKind.Mailroom: Shelves(cluster); Task(cluster,room.Id,OfficeTask.Filing,new Vector3(0,0,-1.3f),false); break;
+                    case OfficeRoomKind.Security: Desk(cluster,room.Id,false); break;
+                    case OfficeRoomKind.Restroom: Washroom(cluster); break;
+                    default: Shelves(cluster); Task(cluster,room.Id,OfficeTask.Repair,new Vector3(0,0,-1.3f),false); break;
+                }
+            }
+            // Partial-height glazed department partitions surround furniture, not transit lanes.
+            if(info.Kind==OfficeRoomKind.Workroom||info.Kind==OfficeRoomKind.Conference||info.Kind==OfficeRoomKind.Executive)
+            {
+                for(int side=-1;side<=1;side+=2)
+                {
+                    Transform partition=A.Group(geometry,"Glazed office divider",new Vector3(side*3.65f,0,1.55f));
+                    A.Box(partition,"Frosted partition",new Vector3(0,1.83f,0),new Vector3(3.7f,2.35f,.045f),A.Glass,false,false);
+                    A.Box(partition,"Partition lower panel",new Vector3(0,.34f,0),new Vector3(3.7f,.68f,.09f),A.Wood,true);
+                    for(int post=-1;post<=1;post++)A.Box(partition,"Partition mullion",new Vector3(post*1.83f,1.5f,0),new Vector3(.045f,3,.065f),A.Dark);
+                    A.Box(partition,"Partition top rail",new Vector3(0,3,0),new Vector3(3.7f,.045f,.065f),A.Dark);
+                }
+            }
+            Transform wallDisplay=A.Group(geometry,"Corporate communications",new Vector3(-4.15f,0,5.58f));
+            A.Box(wallDisplay,"Corporate display frame",new Vector3(0,2.2f,0),new Vector3(2.25f,1.05f,.12f),A.Dark);
+            A.Box(wallDisplay,"Corporate display",new Vector3(0,2.2f,-.07f),new Vector3(2.1f,.91f,.018f),A.Screen);
+            A.Label(wallDisplay,room.Id==0?Plan.Config.Corporation:"PRODUCTIVITY / "+(91+room.Id%9)+"%",new Vector3(0,2.43f,-.09f),.055f);
+            A.Label(wallDisplay,room.Id%3==0?"YOUR BREAK HAS BEEN OPTIMIZED.":"PLEASE ENJOY YOUR ASSIGNED PURPOSE.",new Vector3(0,2.1f,-.09f),.025f);
+            A.Label(wallDisplay,"M / "+Plan.Config.Slogan,new Vector3(0,1.91f,-.09f),.018f);
+            Plant(geometry,new Vector3(5.25f,0,-.9f));
+            // Controlled story cluster: a boxed-up employee rather than random debris.
+            if(room.Id%7==3)
+            {
+                Transform story=A.Group(geometry,"Story / employee relocated",new Vector3(-5.25f,0,.9f));
+                A.Box(story,"Personal effects carton",new Vector3(0,.3f,0),new Vector3(.65f,.6f,.55f),A.Wood);
+                A.Box(story,"Abandoned award",new Vector3(.08f,.78f,0),new Vector3(.12f,.4f,.12f),A.Brass);
+                A.Label(story,"EMPLOYEE 042\nREASSIGNED TO STORAGE",new Vector3(0,.38f,-.29f),.019f);
+            }
+        }
+        public void DressConnector(Transform root,float length,float width,MapLink link)
+        {
+            foreach(MeshRenderer renderer in root.GetComponentsInChildren<MeshRenderer>())renderer.sharedMaterial=renderer.name.Contains("deck")?A.Tile:A.Plaster;
+            for(int sign=-1;sign<=1;sign+=2)
+            {
+                A.Box(root,"Connector skirting",new Vector3(sign*(width/2-.02f),.08f,0),new Vector3(.06f,.16f,length),A.Dark);
+                A.Box(root,"Connector dado",new Vector3(sign*(width/2-.04f),1.05f,0),new Vector3(.04f,.035f,length),A.Brass);
+                A.Box(root,"Inset wayfinding band",new Vector3(sign*(width/2-.04f),2.5f,0),new Vector3(.04f,.2f,length*.8f),A.DepartmentAccents[Plan.Rooms[link.B].Department]);
+                A.Box(root,"Connector wall pilaster",new Vector3(sign*(width/2-.03f),1.5f,0),new Vector3(.07f,3,.09f),A.Metal);
+            }
+            A.Box(root,"Connector light recess",new Vector3(0,3.18f,0),new Vector3(.5f,.06f,Mathf.Min(1.4f,length)),A.Dark);
+            A.Box(root,"Connector opal fixture",new Vector3(0,3.14f,0),new Vector3(.4f,.018f,Mathf.Min(1.3f,length)),A.CoolLight);
+            A.Box(root,"Floor transition strip",new Vector3(0,.015f,0),new Vector3(width,.025f,.065f),A.Brass);
+        }
+        public void Desk(Transform t,int room,bool cubicle)
+        {
+            A.Box(t,"Desk slab / radiused edge",new Vector3(0,.76f,.15f),new Vector3(2.15f,.075f,1.0f),A.Wood,true);
+            for(int side=-1;side<=1;side+=2)
+            {
+                A.Box(t,"Desk trestle",new Vector3(side*.85f,.36f,.2f),new Vector3(.055f,.72f,.65f),A.Metal);
+                A.Box(t,"Desk foot",new Vector3(side*.85f,.055f,.15f),new Vector3(.16f,.1f,.9f),A.Dark);
+            }
+            if(cubicle)
+            {
+                A.Box(t,"Cubicle acoustic divider",new Vector3(0,1.12f,.72f),new Vector3(2.3f,1.26f,.085f),A.Upholstery,true);
+                A.Box(t,"Divider cap",new Vector3(0,1.77f,.72f),new Vector3(2.34f,.035f,.10f),A.Metal);
+                A.Box(t,"Divider side",new Vector3(-1.12f,1.12f,.18f),new Vector3(.085f,1.26f,1.05f),A.Upholstery,true);
+            }
+            Monitor(t,new Vector3(.05f,.81f,.34f));
+            A.Box(t,"Keyboard",new Vector3(.03f,.815f,-.19f),new Vector3(.59f,.035f,.2f),A.Plastic);
+            if(Plan.Config.Quality>=OfficeQuality.Medium) for(int row=0;row<3;row++) for(int key=0;key<10;key++)
+                A.Box(t,"Keycap",new Vector3(-.23f+key*.056f,.84f,-.24f+row*.054f),new Vector3(.043f,.012f,.038f),key%5==0?A.Dark:A.Paper);
+            A.Box(t,"Mouse pad",new Vector3(.59f,.802f,-.17f),new Vector3(.3f,.006f,.28f),A.Dark);
+            A.Round(t,"Mouse",new Vector3(.59f,.83f,-.17f),new Vector3(.07f,.045f,.12f),A.Plastic,PrimitiveType.Sphere);
+            Chair(t,new Vector3(0,0,-.83f));
+            Paperwork(t,new Vector3(-.66f,.81f,-.12f));
+            Mug(t,new Vector3(.81f,.81f,.25f));
+            A.Box(t,"Personal name plate",new Vector3(-.68f,.88f,.47f),new Vector3(.55f,.12f,.1f),A.Brass);
+            A.Label(t,"UNIT "+(room*7+42)+" / ASSOCIATE",new Vector3(-.68f,.89f,.408f),.012f);
+            A.Box(t,"PC tower",new Vector3(.78f,.38f,.33f),new Vector3(.3f,.62f,.47f),A.Dark);
+            A.Box(t,"PC status strip",new Vector3(.78f,.5f,.085f),new Vector3(.15f,.014f,.015f),A.Screen);
+            A.Round(t,"Waste bin",new Vector3(-.84f,.21f,-.42f),new Vector3(.3f,.21f,.3f),A.Metal);
+            A.Box(t,"Cable channel",new Vector3(0,.66f,.46f),new Vector3(1.6f,.045f,.045f),A.Dark);
+            DeskDetails(t,room);
+            Task(t,room,OfficeTask.Typing,new Vector3(0,0,-.83f),true);
+        }
+        public void Monitor(Transform t,Vector3 p)
+        {
+            Transform screen=A.Group(t,"Terminal",p);
+            A.Box(screen,"Monitor foot",new Vector3(0,.025f,0),new Vector3(.36f,.05f,.25f),A.Dark);
+            A.Box(screen,"Monitor riser",new Vector3(0,.15f,.06f),new Vector3(.075f,.28f,.06f),A.Metal);
+            A.Box(screen,"Monitor shell",new Vector3(0,.43f,0),new Vector3(.83f,.52f,.12f),A.Plastic);
+            A.Box(screen,"Screen bezel",new Vector3(0,.43f,-.072f),new Vector3(.75f,.44f,.022f),A.Dark);
+            A.Box(screen,"Phosphor screen",new Vector3(0,.44f,-.085f),new Vector3(.7f,.38f,.008f),A.Screen);
+            for(int line=0;line<5;line++) A.Box(screen,"Screen graph",new Vector3(-.2f+line*.10f,.4f,-.093f),new Vector3(.045f,.06f+line*.035f,.005f),A.CoolLight);
+            A.Label(screen,"M / TASKFLOW",new Vector3(0,.57f,-.098f),.018f);
+        }
+        public void Chair(Transform t,Vector3 p)
+        {
+            Transform c=A.Group(t,"Ergonomic chair",p);
+            A.Round(c,"Chair gas lift",new Vector3(0,.25f,0),new Vector3(.07f,.2f,.07f),A.Metal);
+            for(int i=0;i<5;i++)
+            {
+                Transform leg=A.Group(c,"Chair spoke",Vector3.zero,i*72);
+                A.Box(leg,"Castor arm",new Vector3(0,.1f,.2f),new Vector3(.04f,.045f,.42f),A.Metal);
+                A.Round(leg,"Castor",new Vector3(0,.05f,.38f),new Vector3(.085f,.055f,.085f),A.Dark,PrimitiveType.Sphere);
+            }
+            A.Box(c,"Sculpted seat",new Vector3(0,.46f,0),new Vector3(.53f,.11f,.51f),A.Upholstery);
+            A.Box(c,"Lumbar back",new Vector3(0,.79f,-.24f),new Vector3(.51f,.53f,.095f),A.Upholstery);
+            for(int s=-1;s<=1;s+=2) A.Box(c,"Chair armrest",new Vector3(s*.31f,.68f,.015f),new Vector3(.065f,.05f,.4f),A.Dark);
+        }
+        public void Paperwork(Transform t,Vector3 p)
+        {
+            Transform papers=A.Group(t,"Desk story / rejected requisitions",p,-8);
+            A.Box(papers,"Report stack",new Vector3(0,.018f,0),new Vector3(.31f,.035f,.23f),A.Paper);
+            if(Plan.Config.Quality>=OfficeQuality.Medium) for(int i=0;i<5;i++) A.Box(papers,"Printed report line",new Vector3(-.025f,.038f,-.07f+i*.026f),new Vector3(.19f,.001f,.005f),A.Dark);
+            A.Box(papers,"Rejected rubber stamp",new Vector3(.2f,.04f,.015f),new Vector3(.08f,.075f,.05f),A.Red);
+            A.Box(papers,"Company pen",new Vector3(-.2f,.01f,0),new Vector3(.012f,.013f,.16f),A.Brass);
+        }
+        public void Mug(Transform t,Vector3 p)
+        {
+            A.Round(t,"Employee mug",p+Vector3.up*.065f,new Vector3(.12f,.065f,.12f),A.Plastic);
+            A.Round(t,"Coffee surface",p+Vector3.up*.133f,new Vector3(.102f,.002f,.102f),A.Wood);
+            A.Box(t,"Mug handle",p+new Vector3(.075f,.07f,0),new Vector3(.055f,.075f,.026f),A.Plastic);
+        }
+        public void Plant(Transform t,Vector3 p)
+        {
+            Transform plant=A.Group(t,"Tagged synthetic ficus",p);
+            A.Round(plant,"Ceramic planter",new Vector3(0,.25f,0),new Vector3(.48f,.25f,.48f),A.Plastic);
+            A.Round(plant,"Soil",new Vector3(0,.51f,0),new Vector3(.41f,.01f,.41f),A.Wood);
+            A.Round(plant,"Artificial trunk",new Vector3(0,.95f,0),new Vector3(.045f,.5f,.045f),A.Wood);
+            for(int i=0;i<9;i++)
+            {
+                float angle=i*137.5f*Mathf.Deg2Rad;
+                GameObject leaf=A.Round(plant,"Molded foliage",new Vector3(Mathf.Sin(angle)*.23f,1.05f+i*.067f,Mathf.Cos(angle)*.23f),new Vector3(.18f,.045f,.46f),A.Upholstery,PrimitiveType.Sphere);
+                leaf.transform.localRotation=Quaternion.Euler(15,i*137.5f,-20);
+            }
+            A.Label(plant,"LIVING ASSET\nDO NOT WATER",new Vector3(0,.35f,-.25f),.016f);
+        }
+        void Reception(Transform t,int room)
+        {
+            A.Box(t,"Reception curved counter",new Vector3(0,.57f,.3f),new Vector3(2.25f,1.14f,.8f),A.Wood,true);
+            A.Box(t,"Stone counter cap",new Vector3(0,1.16f,.3f),new Vector3(2.38f,.08f,.92f),A.Tile);
+            for(int i=0;i<14;i++) A.Box(t,"Reception vertical fluting",new Vector3(-1.05f+i*.16f,.61f,-.13f),new Vector3(.035f,.94f,.025f),A.Brass);
+            Transform terminal=A.Group(t,"Reception terminal facing employee",new Vector3(-.58f,1.21f,.36f),180);Monitor(terminal,Vector3.zero);
+            A.Box(t,"Reception keyboard",new Vector3(0,1.22f,.63f),new Vector3(.6f,.035f,.18f),A.Plastic);
+            A.Label(t,"M / VISITOR SERVICES",new Vector3(.2f,.7f,-.16f),.04f);
+            Task(t,room,OfficeTask.Reception,new Vector3(0,0,1.05f),false,180);
+        }
+        void Lounge(Transform t)
+        {
+            A.Box(t,"Upholstered settee",new Vector3(0,.4f,.2f),new Vector3(2.05f,.4f,.78f),A.Upholstery,true);
+            A.Box(t,"Settee back",new Vector3(0,.73f,.54f),new Vector3(2.08f,.55f,.17f),A.Upholstery);
+            for(int s=-1;s<=1;s+=2) A.Box(t,"Settee arm",new Vector3(s*.97f,.65f,.18f),new Vector3(.14f,.36f,.79f),A.Wood);
+            A.Box(t,"Coffee table",new Vector3(0,.35f,-.86f),new Vector3(1.15f,.065f,.53f),A.Wood,true);
+            A.Box(t,"Coffee table pedestal",new Vector3(0,.16f,-.86f),new Vector3(.16f,.32f,.2f),A.Brass);
+            Paperwork(t,new Vector3(.2f,.39f,-.85f));
+            for(int i=-1;i<=1;i++)
+            {
+                A.Box(t,"Individual settee cushion",new Vector3(i*.62f,.61f,.18f),new Vector3(.59f,.075f,.65f),A.Upholstery);
+                A.Box(t,"Settee stitched back seam",new Vector3(i*.62f,.77f,.447f),new Vector3(.006f,.36f,.006f),A.Dark);
+            }
+            A.Box(t,"Company magazine",new Vector3(-.31f,.39f,-.87f),new Vector3(.29f,.02f,.37f),A.Red);
+            A.Box(t,"Magazine title band",new Vector3(-.31f,.403f,-.93f),new Vector3(.24f,.004f,.05f),A.Paper);
+        }
+        void Conference(Transform t,int room)
+        {
+            A.Box(t,"Meeting table",new Vector3(0,.74f,.05f),new Vector3(2.15f,.09f,1.08f),A.Wood,true);
+            A.Box(t,"Meeting pedestal",new Vector3(0,.35f,.05f),new Vector3(.5f,.7f,.5f),A.Dark);
+            Chair(t,new Vector3(-.57f,0,-.8f)); Chair(t,new Vector3(.57f,0,-.8f));
+            Paperwork(t,new Vector3(-.55f,.8f,0)); Mug(t,new Vector3(.55f,.8f,0));
+            A.Box(t,"Presentation board",new Vector3(0,1.72f,.94f),new Vector3(2.2f,1.15f,.075f),A.Paper);
+            A.Box(t,"Whiteboard marker tray",new Vector3(0,1.12f,.83f),new Vector3(2.12f,.035f,.16f),A.Metal);
+            for(int i=0;i<3;i++)A.Box(t,"Dry erase marker",new Vector3(-.6f+i*.3f,1.15f,.81f),new Vector3(.18f,.025f,.025f),i==0?A.Red:A.Dark);
+            A.Box(t,"Conference speakerphone",new Vector3(0,.83f,.12f),new Vector3(.32f,.07f,.25f),A.Dark);
+            A.Box(t,"Speakerphone status",new Vector3(0,.87f,.12f),new Vector3(.08f,.008f,.045f),A.Screen);
+            A.Label(t,"Q4: INCREASE THE INCREASE",new Vector3(0,1.99f,.89f),.03f,Color.black);
+            for(int i=0;i<5;i++) A.Box(t,"Meeting chart",new Vector3(-.65f+i*.3f,1.55f,.89f),new Vector3(.12f,.15f+i*.09f,.015f),A.Red);
+            Task(t,room,OfficeTask.Meeting,new Vector3(-.57f,0,-.8f),true);
+        }
+        void Kitchen(Transform t,int room)
+        {
+            A.Box(t,"Kitchen base cabinetry",new Vector3(0,.45f,.35f),new Vector3(2.05f,.9f,.67f),A.Plastic,true);
+            A.Box(t,"Kitchen worktop",new Vector3(0,.94f,.35f),new Vector3(2.13f,.07f,.73f),A.Tile);
+            for(int s=-1;s<=1;s+=2) A.Box(t,"Cabinet handle",new Vector3(s*.5f,.72f,-.02f),new Vector3(.26f,.035f,.04f),A.Metal);
+            A.Box(t,"Coffee dispenser",new Vector3(-.55f,1.24f,.36f),new Vector3(.52f,.54f,.45f),A.Dark);
+            A.Box(t,"Coffee status display",new Vector3(-.55f,1.34f,.12f),new Vector3(.25f,.11f,.015f),A.Screen);
+            A.Round(t,"Coffee spout",new Vector3(-.55f,1.1f,.1f),new Vector3(.055f,.08f,.055f),A.Metal);
+            Mug(t,new Vector3(-.55f,.99f,.04f)); Mug(t,new Vector3(.5f,.99f,.2f));
+            A.Box(t,"Microwave",new Vector3(.5f,1.2f,.38f),new Vector3(.75f,.4f,.44f),A.Plastic);
+            A.Box(t,"Microwave window",new Vector3(.45f,1.2f,.148f),new Vector3(.48f,.26f,.014f),A.Dark);
+            A.Label(t,"DO NOT MICROWAVE YOUR HANDS",new Vector3(0,1.95f,.66f),.028f);
+            KitchenDetails(t);
+            Task(t,room,OfficeTask.Coffee,new Vector3(-.55f,0,-.65f),false);
+        }
+        public void Server(Transform t)
+        {
+            A.Box(t,"Rack cabinet",new Vector3(0,1.08f,.25f),new Vector3(1.05f,2.16f,.85f),A.Dark,true);
+            for(int i=0;i<10;i++)
+            {
+                A.Box(t,"Rack module",new Vector3(0,.22f+i*.19f,-.19f),new Vector3(.91f,.15f,.055f),A.Metal);
+                for(int led=0;led<3;led++) A.Box(t,"Server activity LED",new Vector3(.21f+led*.08f,.22f+i*.19f,-.225f),new Vector3(.025f,.02f,.012f),led==0?A.WarmLight:A.Screen);
+                A.Box(t,"Rack service label",new Vector3(-.16f,.22f+i*.19f,-.224f),new Vector3(.22f,.035f,.01f),A.Paper);
+                for(int side=-1;side<=1;side+=2)A.Box(t,"Rack grab handle",new Vector3(side*.40f,.22f+i*.19f,-.24f),new Vector3(.025f,.095f,.04f),A.Dark);
+                if(Plan.Config.Quality>=OfficeQuality.High)for(int vent=0;vent<5;vent++)A.Box(t,"Rack cooling grille",new Vector3(-.29f+vent*.065f,.26f+i*.19f,-.226f),new Vector3(.03f,.012f,.012f),A.Dark);
+                A.Box(t,"Cable loom",new Vector3(.58f,.23f+i*.17f,.1f),new Vector3(.06f,.06f,.42f),A.Red);
+            }
+        }
+        void Shelves(Transform t)
+        {
+            for(int side=-1;side<=1;side+=2) A.Box(t,"Archive upright",new Vector3(side*.92f,1.1f,.3f),new Vector3(.07f,2.2f,.78f),A.Metal,true);
+            for(int shelf=0;shelf<5;shelf++)
+            {
+                A.Box(t,"Archive shelf",new Vector3(0,.15f+shelf*.43f,.3f),new Vector3(1.85f,.04f,.8f),A.Metal);
+                for(int box=0;box<4;box++)
+                {
+                    A.Box(t,"Filed asset carton",new Vector3(-.7f+box*.47f,.34f+shelf*.43f,.3f),new Vector3(.41f,.33f,.6f),box%2==0?A.Plastic:A.Wood);
+                    A.Box(t,"Archive handle recess",new Vector3(-.7f+box*.47f,.44f+shelf*.43f,-.007f),new Vector3(.11f,.035f,.014f),A.Dark);
+                    A.Box(t,"Carton lid",new Vector3(-.7f+box*.47f,.51f+shelf*.43f,.3f),new Vector3(.425f,.028f,.62f),A.Paper);
+                    A.Box(t,"Archive index label",new Vector3(-.7f+box*.47f,.36f+shelf*.43f,-.008f),new Vector3(.22f,.07f,.012f),A.Paper);
+                }
+            }
+        }
+        void Washroom(Transform t)
+        {
+            A.Box(t,"Vanity counter",new Vector3(0,.82f,.3f),new Vector3(1.95f,.12f,.72f),A.Tile,true);
+            for(int side=-1;side<=1;side+=2)
+            {
+                A.Round(t,"Inset basin",new Vector3(side*.5f,.89f,.24f),new Vector3(.55f,.045f,.43f),A.Plastic);
+                A.Box(t,"Automatic faucet",new Vector3(side*.5f,1.01f,.49f),new Vector3(.045f,.26f,.16f),A.Metal);
+                A.Box(t,"Mirror",new Vector3(side*.5f,1.65f,.72f),new Vector3(.74f,.94f,.025f),A.Metal);
+            }
+            A.Box(t,"Soap dispenser",new Vector3(0,1.3f,.64f),new Vector3(.22f,.32f,.14f),A.Plastic);
+            A.Box(t,"Soap level window",new Vector3(0,1.29f,.56f),new Vector3(.06f,.17f,.015f),A.Screen);
+            A.Box(t,"Towel dispenser",new Vector3(.94f,1.46f,.60f),new Vector3(.26f,.35f,.18f),A.Metal);
+            A.Box(t,"Paper towel",new Vector3(.94f,1.2f,.58f),new Vector3(.20f,.19f,.015f),A.Paper);
+            A.Label(t,"HANDWASH CYCLE / 40 SECONDS",new Vector3(0,2.3f,.68f),.027f);
+        }
+        public void Vending(Transform t)
+        {
+            A.Box(t,"Nourish-9 housing",new Vector3(0,1.03f,0),new Vector3(1.24f,2.05f,.88f),A.Red);
+            A.Box(t,"Vending face",new Vector3(0,1.02f,-.454f),new Vector3(1.12f,1.94f,.035f),A.Dark);
+            A.Box(t,"Product cavity",new Vector3(-.15f,1.25f,-.48f),new Vector3(.76f,1.12f,.025f),A.Plastic);
+            for(int row=0;row<4;row++) for(int col=0;col<4;col++)
+            {
+                A.Round(t,"Visible nutrient can",new Vector3(-.44f+col*.18f,.79f+row*.26f,-.51f),new Vector3(.115f,.085f,.115f),(col+row)%2==0?A.Brass:A.Upholstery);
+                A.Box(t,"Product shelf",new Vector3(-.15f,.69f+row*.26f,-.53f),new Vector3(.75f,.025f,.1f),A.Metal);
+            }
+            A.Box(t,"Product safety glass",new Vector3(-.15f,1.24f,-.59f),new Vector3(.78f,1.14f,.012f),A.Glass,false,false);
+            A.Box(t,"Reader display",new Vector3(.43f,1.5f,-.49f),new Vector3(.18f,.17f,.022f),A.Screen);
+            for(int i=0;i<6;i++) A.Box(t,"Selection button",new Vector3(.38f+i%2*.09f,1.25f-i/2*.1f,-.5f),new Vector3(.055f,.048f,.03f),A.Plastic);
+            A.Box(t,"Delivery chute",new Vector3(0,.37f,-.49f),new Vector3(.83f,.25f,.07f),A.Metal);
+            A.Label(t,"NOURISH / 9",new Vector3(0,1.88f,-.485f),.056f);
+            A.Label(t,"HUMAN FLAVOUR. ZERO HUMANS.",new Vector3(0,.57f,-.5f),.018f);
+            VendingDetails(t);
+        }
+        void Task(Transform t,int room,OfficeTask activity,Vector3 p,bool seated,float yaw=0)
+        {
+            Transform point=A.Group(t,"Task / "+activity,p,yaw); OfficeTaskPoint task=point.gameObject.AddComponent<OfficeTaskPoint>();
+            task.RoomId=room; task.Activity=activity; task.Seated=seated;
+        }
+    }
+}
+
+

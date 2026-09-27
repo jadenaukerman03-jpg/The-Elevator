@@ -1,0 +1,77 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe5a775c5179ad2449560538720e5043, type: 3}
+  m_Name: CivicWorks
+  m_EditorClassIdentifier: Assembly-CSharp::TheElevator.Generation.FloorContentCatalog
+  ThemeId: civic-works
+  ThemeRevision: 1
+  Modules:
+  - Id: arrival
+    Style: 0
+    Weight: 1
+    CeilingMillimeters: 3800
+    ContentRevision: 1
+  - Id: records
+    Style: 1
+    Weight: 4
+    CeilingMillimeters: 3600
+    ContentRevision: 1
+  - Id: pumps
+    Style: 2
+    Weight: 3
+    CeilingMillimeters: 4200
+    ContentRevision: 1
+  - Id: sorting
+    Style: 3
+    Weight: 3
+    CeilingMillimeters: 4000
+    ContentRevision: 1
+  - Id: breakroom
+    Style: 4
+    Weight: 2
+    CeilingMillimeters: 3400
+    ContentRevision: 1
+  - Id: landmark
+    Style: 5
+    Weight: 1
+    CeilingMillimeters: 4900
+    ContentRevision: 1
+  - Id: stairs
+    Style: 6
+    Weight: 1
+    CeilingMillimeters: 5800
+    ContentRevision: 1
+  Districts:
+  - Id: records
+    DisplayName: RECORDS
+    ModuleIds:
+    - records
+    - breakroom
+    WetFloor: 0
+  - Id: utilities
+    DisplayName: UTILITIES
+    ModuleIds:
+    - pumps
+    - breakroom
+    WetFloor: 1
+  - Id: dispatch
+    DisplayName: DISPATCH
+    ModuleIds:
+    - sorting
+    - breakroom
+    WetFloor: 0
+  PrefabOverrides: []
+  WallColor: {r: 0.27, g: 0.34, b: 0.33, a: 1}
+  FloorColor: {r: 0.2, g: 0.24, b: 0.23, a: 1}
+  RecordsAccent: {r: 0.95, g: 0.67, b: 0.21, a: 1}
+  UtilitiesAccent: {r: 0.21, g: 0.67, b: 0.78, a: 1}
+  DispatchAccent: {r: 0.83, g: 0.35, b: 0.25, a: 1}

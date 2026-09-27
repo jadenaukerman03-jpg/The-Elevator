@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a587cc0e48d90114092f4be0370f05c2, type: 3}
+  m_Name: Large
+  m_EditorClassIdentifier: Assembly-CSharp::TheElevator.Generation.FloorGenerationProfile
+  Settings:
+    ProfileId: Large
+    TargetRooms: 120
+    MainRouteRooms: 38
+    MaxBranchDepth: 9
+    VerticalLayers: 2
+    LoopCount: 14
+    LandmarkCount: 9
+    OptionalZoneCount: 12
+    ObjectiveCount: 4
+    ObjectiveMinDistance: 16
+    PropDensityPercent: 75
+    HazardDensityPercent: 16
+    EnemySpawnCapacity: 10
+    ExplorationSeconds: 1800
+    MaxGenerationAttempts: 16
+    OperationBudget: 250000
+    GeometryBudgetMilliseconds: 5
+    ExpectedPlayers: 4
+    CellSizeMillimeters: 14000
+    RoomSizeMillimeters: 12000
+    LayerHeightMillimeters: 6000
+    DoorWidthMillimeters: 2800
+    DoorHeightMillimeters: 2800
+    CorridorWidthMillimeters: 3400

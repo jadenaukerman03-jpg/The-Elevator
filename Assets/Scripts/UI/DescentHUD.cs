@@ -1,0 +1,162 @@
+using UnityEngine;
+
+namespace TheElevator
+{
+    public sealed class DescentHUD : MonoBehaviour
+    {
+        DescentGame game;
+        GUIStyle title, heading, body, small, button;
+        int suit;
+        readonly string[] suitNames = { "SAFETY YELLOW", "QUESTIONABLE MINT", "BRUISE PURPLE", "INCIDENT RED" };
+        public void Initialize(DescentGame owner) { game = owner; }
+
+        void Styles()
+        {
+            if (title != null) return;
+            title = new GUIStyle(GUI.skin.label) { fontSize = 66, fontStyle = FontStyle.Bold, wordWrap = true };
+            heading = new GUIStyle(GUI.skin.label) { fontSize = 24, fontStyle = FontStyle.Bold };
+            body = new GUIStyle(GUI.skin.label) { fontSize = 18, wordWrap = true };
+            small = new GUIStyle(GUI.skin.label) { fontSize = 13, wordWrap = true };
+            button = new GUIStyle(GUI.skin.button) { fontSize = 18, fontStyle = FontStyle.Bold };
+            title.normal.textColor = Workshop.Cream;
+            heading.normal.textColor = Workshop.Cream;
+            body.normal.textColor = Workshop.Cream;
+            small.normal.textColor = new Color(0.68f, 0.76f, 0.74f);
+            button.normal.textColor = Workshop.Ink;
+        }
+
+        void Panel(Rect rect, Color color)
+        {
+            Color previous = GUI.color;
+            GUI.color = color;
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = previous;
+        }
+        bool Button(Rect rect, string label, Color color)
+        {
+            Color old = GUI.backgroundColor;
+            GUI.backgroundColor = color;
+            bool pressed = GUI.Button(rect, label, button);
+            GUI.backgroundColor = old;
+            return pressed;
+        }
+        void Text(Rect rect, string text, GUIStyle style) { GUI.Label(rect, text, style); }
+        void Bar(Rect rect, float fraction, Color color)
+        {
+            Panel(rect, new Color(0.15f, 0.22f, 0.23f));
+            Panel(new Rect(rect.x, rect.y, rect.width * Mathf.Clamp01(fraction), rect.height), color);
+        }
+
+        void OnGUI()
+        {
+            if (!game || !game.Player) return;
+            Styles();
+            float scale = Mathf.Min(Screen.width / 1280f, Screen.height / 720f);
+            float width = Screen.width / scale;
+            float height = Screen.height / scale;
+            GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one * scale);
+            if (game.Phase == DescentGame.RunPhase.Generating)
+            {
+                Panel(new Rect(32,32,590,height - 64),new Color(0.025f,0.055f,0.065f,0.97f));
+                Text(new Rect(66,100,510,100),"LOCATING\nYOUR FLOOR",heading);
+                Text(new Rect(66,230,510,65),"Preparing rooms, routes, landmarks, and service access.",body);
+                Bar(new Rect(66,340,490,8),game.GenerationProgress,Workshop.Yellow);
+                Text(new Rect(66,375,500,70),"SEED " + game.ActiveSeed + "\n" + Mathf.RoundToInt(game.GenerationProgress * 100) + "%",body);
+                return;
+            }
+            if (game.Phase == DescentGame.RunPhase.Briefing)
+            {
+                Panel(new Rect(32, 32, 590, height - 64), new Color(0.025f, 0.055f, 0.065f, 0.97f));
+                Panel(new Rect(32, 32, 590, 6), Workshop.Yellow);
+                Text(new Rect(66, 61, 520, 24), "FACILITY SERVICES / EMPLOYEE INDUCTION 004", small);
+                Text(new Rect(62, 100, 535, 160), "THE\nELEVATOR", title);
+                Text(new Rect(66, 277, 505, 35), game.CurrentOffice ? "FLOOR 1 / MORROW SYSTEMS" : "Going down. Mostly.", heading);
+                Text(new Rect(66, 332, 500, 80), game.CurrentOffice ? "You are here to steal office equipment. Lift a supervisor badge, open the secured room, and bring the required asset back to the elevator." : game.UseProceduralFloors ? "A sprawling facility. One freight lift. Find remote survey stations, recover valuables, and remember your way back." : "Three floors. One freight lift. Grab whatever looks expensive and get back before the doors close.", body);
+                Text(new Rect(66, 422, 500, 58), game.CurrentOffice ? "G: lift badge from behind. E: swipe / attach dolly. Q: release. R: depart once the entire required asset is inside the lift." : "Batteries keep you moving. Heavy cargo slows the doors and burns extra power. You count toward the weight limit.", body);
+                if (Button(new Rect(66, 502, 500, 42), "UNIFORM: " + suitNames[suit], WorkerModel.SuitColors[suit]))
+                { suit = (suit + 1) % 4; game.Player.Model.SetColor(suit); }
+                if (Button(new Rect(66, 558, 500, 56), "CLOCK IN  /  START DESCENT", Workshop.Yellow)) game.Begin();
+                Text(new Rect(66, 631, 500, 22), "EARLY PROTOTYPE  /  SINGLE PLAYER  /  WINDOWS", small);
+                Text(new Rect(width - 530, height - 60, 490, 32), "WASD MOVE  /  E INTERACT  /  L FLASHLIGHT  /  F3 DEBUG", small);
+                return;
+            }
+
+            Panel(new Rect(24, 24, 374, 105), new Color(0.025f, 0.055f, 0.065f, 0.92f));
+            Text(new Rect(42, 37, 335, 35), "B" + (game.FloorIndex + 1).ToString("00") + "  /  " +
+                (game.Phase == DescentGame.RunPhase.Transit ? "DESCENDING" : "SALVAGE SHIFT"), heading);
+            string location = game.CurrentMap && game.CurrentMap.Ready ? game.Player.InCabin ? "FREIGHT 04 / SAFE ARRIVAL" :
+                game.CurrentMap.NearestRoom(game.Player.transform.position).District + " / ROOM " + game.CurrentMap.NearestRoom(game.Player.transform.position).Id.ToString("000") : FacilityBuilder.Names[game.FloorIndex];
+            if(game.CurrentOffice&&!game.Player.InCabin)
+            {
+                int room=game.CurrentMap.NearestRoom(game.Player.transform.position).Id;
+                location=game.CurrentOffice.Plan.Rooms[room].Kind.ToString().ToUpper()+" / ROOM "+room.ToString("000");
+            }
+            Text(new Rect(42, 78, 335, 38), location, small);
+            if (game.CurrentMap && game.CurrentMap.Ready)
+                Text(new Rect(42,132,600,25),"SEED " + game.ActiveSeed + "   /   SURVEYS " + game.CurrentMap.CompletedObjectives + "/" + game.CurrentMap.Manifest.Recipe.Settings.ObjectiveCount,small);
+            Panel(new Rect(width - 280, 24, 256, 105), new Color(0.025f, 0.055f, 0.065f, 0.92f));
+            int secondsLeft = Mathf.CeilToInt(game.Clock);
+            string clock = game.Phase == DescentGame.RunPhase.Closing ? "DOORS CLOSING" :
+                game.Phase == DescentGame.RunPhase.Transit ? "PLEASE STAND BY" :
+                "DEPARTS " + (secondsLeft / 60).ToString("00") + ":" + (secondsLeft % 60).ToString("00");
+            Text(new Rect(width - 263, 38, 225, 35), clock, heading);
+            Text(new Rect(width - 263, 82, 230, 22), "RECOVERED   $" + game.CargoValue, body);
+            if (game.Phase == DescentGame.RunPhase.Closing)
+                Bar(new Rect(width - 263, 118, 220, 4), 1 - game.ClosingProgress, Workshop.Red);
+
+            float bottom = height - 150;
+            Panel(new Rect(24, bottom, 300, 126), new Color(0.025f, 0.055f, 0.065f, 0.92f));
+            Text(new Rect(42, bottom + 13, 265, 24), "LIFT POWER  " + Mathf.CeilToInt(game.Power) + "%", body);
+            Bar(new Rect(42, bottom + 44, 264, 6), game.Power / 100, Workshop.Mint);
+            Text(new Rect(42, bottom + 63, 265, 24), "LOAD  " + Mathf.CeilToInt(game.Load) + " / 180 KG", body);
+            Bar(new Rect(42, bottom + 96, 264, 6), game.Load / RunRules.Capacity,
+                game.Load > RunRules.Capacity ? Workshop.Red : Workshop.Yellow);
+            Text(new Rect(342, height - 75, 520, 23), "STAMINA", small);
+            Bar(new Rect(342, height - 47, 180, 5), game.Player.Stamina, Workshop.Cream);
+            Text(new Rect(width - 267, height - 83, 245, 25), "INCIDENTS LEFT  " + game.Player.Health + " / 3", body);
+            Text(new Rect(width - 267, height - 51, 245, 24), "L  LIGHT     ESC  PAUSE", small);
+            if (game.Load > RunRules.Capacity)
+                Text(new Rect(342, bottom, 600, 27), "OVERLOADED  /  EXTRA POWER + SLOWER DOORS", body);
+
+            Panel(new Rect(width / 2 - 2, height / 2 - 2, 4, 4), Workshop.Cream);
+            if (!string.IsNullOrEmpty(game.Player.Prompt) && game.ControlsActive)
+            {
+                Panel(new Rect(width / 2 - 330, height / 2 + 65, 660, 39), new Color(0.025f, 0.055f, 0.065f, 0.92f));
+                Text(new Rect(width / 2 - 314, height / 2 + 75, 640, 24), game.Player.Prompt, small);
+            }
+            if (Time.unscaledTime < game.NoticeUntil)
+            {
+                Panel(new Rect(width / 2 - 365, 147, 730, 66), new Color(0.025f, 0.055f, 0.065f, 0.92f));
+                Text(new Rect(width / 2 - 348, 158, 698, 53), game.Notice, body);
+            }
+            if (game.Player.Held)
+                Text(new Rect(342, height - 116, 640, 28), "CARRYING  " + game.Player.Held.Title.ToUpper() + "  /  " + game.Player.Held.Mass + " KG", body);
+
+            if (game.Paused || game.Phase == DescentGame.RunPhase.Won || game.Phase == DescentGame.RunPhase.Lost)
+                Overlay(width, height);
+        }
+
+        void Overlay(float width, float height)
+        {
+            Panel(new Rect(0, 0, width, height), new Color(0.015f, 0.035f, 0.045f, 0.92f));
+            float x = width / 2 - 280;
+            bool ended = !game.Paused;
+            Text(new Rect(x, 90, 560, 90), ended ? game.Phase == DescentGame.RunPhase.Won ? "SHIFT COMPLETE" : "SHIFT TERMINATED" : "ON BREAK", heading);
+            if (ended)
+            {
+                Text(new Rect(x, 165, 560, 85), game.Outcome, body);
+                Text(new Rect(x, 250, 560, 50), "$" + game.CargoValue + " IN CABIN", heading);
+                Text(new Rect(x, 307, 560, 40), game.Phase == DescentGame.RunPhase.Won ? RunRules.Grade(game.CargoValue) : "Try lighter cargo. Leave earlier. Bring a battery.", body);
+            }
+            else
+            {
+                Text(new Rect(x, 165, 560, 210), "WASD   Move       MOUSE   Look\nSHIFT   Sprint       SPACE   Jump\nE   Interact / carry       Q   Throw\nF   Connect held battery inside lift\nR   Depart early       L   Flashlight\nF3   Generation debug       ESC   Resume\n\nExplore, record remote surveys, and return to the lift.", body);
+            }
+            if (Button(new Rect(x, 410, 560, 52), ended ? "CLOCK IN AGAIN" : "BACK TO WORK", Workshop.Yellow))
+            { if (ended) game.Restart(); else game.SetPaused(false); }
+            if (!ended && Button(new Rect(x, 477, 560, 45), "RESTART SHIFT", Workshop.Cream)) game.Restart();
+            if (Button(new Rect(x, 540, 560, 45), "QUIT", Workshop.Cream)) game.Quit();
+        }
+    }
+}
+
