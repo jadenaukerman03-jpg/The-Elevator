@@ -5,9 +5,10 @@ namespace TheElevator
     public sealed class DescentHUD : MonoBehaviour
     {
         DescentGame game;
-        GUIStyle title, heading, body, small, button;
-        int suit;
-        readonly string[] suitNames = { "SAFETY YELLOW / HARD HAT", "QUESTIONABLE MINT / BEANIE", "BRUISE PURPLE / BALL CAP", "INCIDENT RED / GOGGLES" };
+        GUIStyle title, heading, body, small, button, choice;
+        bool settings;
+        static readonly WardrobeSlot[] slots = (WardrobeSlot[])System.Enum.GetValues(typeof(WardrobeSlot));
+        static readonly string[] slotLabels = { "SKIN COLOR", "HEAD", "EYES", "MOUTH", "EYEBROWS", "GLASSES", "SHIRT", "JACKET", "PANTS", "SHOES", "GEAR" };
         public void Initialize(DescentGame owner) { game = owner; }
 
         void Styles()
@@ -18,6 +19,8 @@ namespace TheElevator
             body = new GUIStyle(GUI.skin.label) { fontSize = 18, wordWrap = true };
             small = new GUIStyle(GUI.skin.label) { fontSize = 13, wordWrap = true };
             button = new GUIStyle(GUI.skin.button) { fontSize = 18, fontStyle = FontStyle.Bold };
+            choice = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            choice.normal.textColor = Workshop.Cream;
             title.normal.textColor = Workshop.Cream;
             heading.normal.textColor = Workshop.Cream;
             body.normal.textColor = Workshop.Cream;
@@ -55,6 +58,8 @@ namespace TheElevator
             float width = Screen.width / scale;
             float height = Screen.height / scale;
             GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one * scale);
+            if (settings && !game.Paused && game.Phase != DescentGame.RunPhase.Briefing) CloseSettings();
+            if (settings) { Settings(height); return; }
             if (game.Phase == DescentGame.RunPhase.Generating)
             {
                 Panel(new Rect(32,32,590,height - 64),new Color(0.025f,0.055f,0.065f,0.97f));
@@ -73,8 +78,7 @@ namespace TheElevator
                 Text(new Rect(66, 277, 505, 35), game.CurrentOffice ? "FLOOR 1 / MORROW SYSTEMS" : "Going down. Mostly.", heading);
                 Text(new Rect(66, 332, 500, 80), game.CurrentOffice ? "You are here to steal office equipment. Find the reception access card, open the secured room, and bring the required asset back to the elevator." : game.UseProceduralFloors ? "A sprawling facility. One freight lift. Find remote survey stations, recover valuables, and remember your way back." : "Three floors. One freight lift. Grab whatever looks expensive and get back before the doors close.", body);
                 Text(new Rect(66, 422, 500, 58), game.CurrentOffice ? "Your field notebook is on the table inside the elevator. Read it for controls, access and floor selection." : "Batteries keep you moving. Heavy cargo slows the doors and burns extra power. You count toward the weight limit.", body);
-                if (Button(new Rect(66, 502, 500, 42), "UNIFORM: " + suitNames[suit], WorkerModel.SuitColors[suit]))
-                { suit = (suit + 1) % 4; game.Player.Model.SetColor(suit); }
+                if (Button(new Rect(66, 502, 500, 42), "SETTINGS  /  CUSTOMIZE AVATAR", Workshop.Cream)) settings = true;
                 if (Button(new Rect(66, 558, 500, 56), "CLOCK IN  /  START DESCENT", Workshop.Yellow)) game.Begin();
                 Text(new Rect(66, 631, 500, 22), "EARLY PROTOTYPE  /  SINGLE PLAYER  /  WINDOWS", small);
                 Text(new Rect(width - 530, height - 60, 490, 32), "WASD MOVE  /  E INTERACT  /  L FLASHLIGHT  /  F3 DEBUG", small);
@@ -167,8 +171,40 @@ namespace TheElevator
             }
             if (Button(new Rect(x, 410, 560, 52), ended ? "CLOCK IN AGAIN" : "BACK TO WORK", Workshop.Yellow))
             { if (ended) game.Restart(); else game.SetPaused(false); }
-            if (!ended && Button(new Rect(x, 477, 560, 45), "RESTART SHIFT", Workshop.Cream)) game.Restart();
-            if (Button(new Rect(x, 540, 560, 45), "QUIT", Workshop.Cream)) game.Quit();
+            if (!ended && Button(new Rect(x, 474, 560, 45), "SETTINGS  /  AVATAR", Workshop.Cream)) { settings = true; game.Player.PreviewAvatar = true; }
+            if (!ended && Button(new Rect(x, 530, 560, 45), "RESTART SHIFT", Workshop.Cream)) game.Restart();
+            if (Button(new Rect(x, ended ? 480 : 586, 560, 45), "QUIT", Workshop.Cream)) game.Quit();
+        }
+
+        void CloseSettings() { settings = false; game.Player.PreviewAvatar = false; }
+
+        // Avatar customizer. Lives in settings for now; the lobby shop will reuse the wardrobe and its prices.
+        void Settings(float height)
+        {
+            Panel(new Rect(32, 32, 590, height - 64), new Color(0.025f, 0.055f, 0.065f, 0.97f));
+            Panel(new Rect(32, 32, 590, 6), Workshop.Yellow);
+            Text(new Rect(66, 56, 520, 30), "SETTINGS  /  AVATAR", heading);
+            Text(new Rect(66, 90, 520, 22), "Pick a look. Changes save automatically.", small);
+            AvatarLoadout loadout = game.Player.Model.Loadout.Clone();
+            bool changed = false;
+            for (int i = 0; i < slots.Length; i++)
+            {
+                float y = 124 + i * 42;
+                WardrobeSlot slot = slots[i];
+                int index = loadout.Get(slot);
+                Text(new Rect(66, y + 6, 160, 24), slotLabels[i], small);
+                if (Button(new Rect(226, y, 44, 34), "<", Workshop.Cream)) { loadout.Set(slot, index - 1); changed = true; }
+                Panel(new Rect(276, y, 240, 34), new Color(0.08f, 0.13f, 0.15f));
+                if (slot == WardrobeSlot.Skin) Panel(new Rect(282, y + 6, 22, 22), BeanRig.SkinColors[index]);
+                GUI.Label(new Rect(276, y, 240, 34), AvatarWardrobe.Name(slot, index) + "  (" + (index + 1) + "/" + AvatarWardrobe.Count(slot) + ")", choice);
+                if (Button(new Rect(522, y, 44, 34), ">", Workshop.Cream)) { loadout.Set(slot, index + 1); changed = true; }
+            }
+            float buttons = 124 + slots.Length * 42 + 8;
+            if (Button(new Rect(66, buttons, 160, 44), "RANDOM", Workshop.Mint))
+            { foreach (WardrobeSlot slot in slots) loadout.Set(slot, Random.Range(0, AvatarWardrobe.Count(slot))); changed = true; }
+            if (Button(new Rect(236, buttons, 160, 44), "PLAIN", Workshop.Cream)) { loadout = new AvatarLoadout(); changed = true; }
+            if (Button(new Rect(406, buttons, 160, 44), "DONE", Workshop.Yellow)) CloseSettings();
+            if (changed) { game.Player.Model.Apply(loadout); loadout.Save(); }
         }
     }
 }

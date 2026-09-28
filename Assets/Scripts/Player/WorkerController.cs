@@ -18,6 +18,7 @@ namespace TheElevator
         public string Prompt { get; private set; }
         public bool MovingFast { get; private set; }
         public bool ReadingNotebook { get; set; }
+        public bool PreviewAvatar { get; set; }
         public bool CanInteract { get; private set; }
         public float MotionSpeed { get { return motor?new Vector2(motor.velocity.x,motor.velocity.z).magnitude:0; } }
         ElevatorButton elevatorButton;
@@ -259,6 +260,17 @@ namespace TheElevator
                 Model.Animate(0, false, Time.unscaledDeltaTime);
                 View.transform.position = new Vector3(3.1f, 2.25f, -2.7f);
                 View.transform.LookAt(transform.position + Vector3.up * 1.05f);
+                return;
+            }
+            if (PreviewAvatar)
+            {
+                // Outfit settings mid-shift: face the player's own body on the right of the screen.
+                if(Hands)Hands.gameObject.SetActive(false);
+                Model.SetView(false,false);
+                View.rect = new Rect(0.45f, 0, 0.55f, 1);
+                Model.Animate(0, false, Time.unscaledDeltaTime);
+                View.transform.position = transform.TransformPoint(new Vector3(0.9f, 1.55f, 2.9f));
+                View.transform.LookAt(transform.position + Vector3.up * 1.0f);
                 return;
             }
             Model.SetView(firstPerson,Crouched);

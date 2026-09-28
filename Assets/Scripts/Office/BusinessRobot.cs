@@ -25,7 +25,8 @@ namespace TheElevator.Office
         public Vector3 LookTarget;
         public void Build(OfficeArt a,int variant,bool supervisor,BeanOutfit outfit=BeanOutfit.Office)
         {
-            BeanLook look=new BeanLook{Outfit=outfit,Skin=BeanRig.SkinColors[(variant*5+2)%BeanRig.SkinColors.Length],Eyes=variant%3,Mouth=variant%4};
+            BeanLook look=new BeanLook{Outfit=outfit,Skin=BeanRig.SkinColors[(variant*5+2)%BeanRig.SkinColors.Length],Eyes=variant%3,Mouth=variant%4,
+                Brows=variant%4,Glasses=outfit==BeanOutfit.Clerk?1:0};
             switch(outfit)
             {
                 case BeanOutfit.Reception:look.Primary=Blouses[variant%Blouses.Length];look.Accent=new Color(.20f,.21f,.25f);break;

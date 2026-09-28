@@ -3,15 +3,16 @@ using UnityEngine;
 
 namespace TheElevator
 {
-    public enum BeanOutfit { Crew, Office, Reception, Technician, Clerk, Security }
+    // Plain is the undressed avatar base that the wardrobe layers clothing onto; the rest are NPC job outfits.
+    public enum BeanOutfit { Plain, Office, Reception, Technician, Clerk, Security }
 
     // Flat colors only: the style reads through silhouette and hue, never texture or small hardware.
-    // Primary is the main garment, Accent the tie/hat/headset, Hat picks the crew headwear (0-3).
+    // Primary is the main garment, Accent the tie/cap/headset. Face features index the styles in BuildFace.
     public struct BeanLook
     {
         public BeanOutfit Outfit;
         public Color Skin, Primary, Accent;
-        public int Eyes, Mouth, Hat;
+        public int Eyes, Mouth, Brows, Glasses;
     }
 
     public struct BeanPose
@@ -23,8 +24,9 @@ namespace TheElevator
     }
 
     // Big round head sunk into a bean torso, long noodle arms, short legs, painted-on face.
-    // Built from a few smooth procedural meshes shared by every character.
-    public sealed class BeanRig : MonoBehaviour
+    // Built from a few smooth procedural meshes shared by every character; clothing lives in BeanRig.Clothing
+    // (NPC jobs) and AvatarWardrobe (player cosmetics), both layered through the public builder API below.
+    public sealed partial class BeanRig : MonoBehaviour
     {
         public static readonly Color[] SkinColors = {
             new Color(.97f,.45f,.40f), new Color(1f,.62f,.26f), new Color(1f,.83f,.30f),
@@ -32,38 +34,25 @@ namespace TheElevator
             new Color(.36f,.61f,.96f), new Color(.63f,.49f,.93f), new Color(.96f,.56f,.79f)
         };
         public static readonly Color Cream = new Color(.97f,.95f,.88f);
-        static readonly Color FaceInk = new Color(.07f,.07f,.09f);
-        public static readonly Color Glove =new Color(.25f,.27f,.31f);
-        static readonly Color Trousers = new Color(.21f,.23f,.29f);
-        static readonly Color WorkTrousers = new Color(.52f,.45f,.33f);
-        static readonly Color Boots = new Color(.17f,.15f,.15f);
-        static readonly Color Leather = new Color(.36f,.22f,.14f);
-        static readonly Color Gold = new Color(1f,.78f,.25f);
-        static readonly Color Lens = new Color(.30f,.82f,.86f);
-
-        // Four distinct maintenance-crew looks, one per future co-op player.
-        public static BeanLook CrewLook(int teammate)
-        {
-            switch (teammate % 4)
-            {
-                case 1: return new BeanLook { Outfit = BeanOutfit.Crew, Skin = SkinColors[0], Primary = Workshop.Mint, Accent = new Color(.90f,.27f,.27f), Hat = 1, Eyes = 1, Mouth = 3 };
-                case 2: return new BeanLook { Outfit = BeanOutfit.Crew, Skin = SkinColors[3], Primary = new Color(.73f,.53f,.91f), Accent = new Color(.14f,.50f,.56f), Hat = 2, Eyes = 2, Mouth = 0 };
-                case 3: return new BeanLook { Outfit = BeanOutfit.Crew, Skin = SkinColors[2], Primary = Workshop.Red, Accent = new Color(.20f,.21f,.25f), Hat = 3, Eyes = 0, Mouth = 2 };
-                default: return new BeanLook { Outfit = BeanOutfit.Crew, Skin = SkinColors[6], Primary = Workshop.Yellow, Accent = new Color(.97f,.95f,.90f), Hat = 0, Eyes = 0, Mouth = 0 };
-            }
-        }
+        public static readonly Color FaceInk = new Color(.07f,.07f,.09f);
+        public static readonly Color Trousers = new Color(.24f,.26f,.32f);
+        public static readonly Color Shoes = new Color(.17f,.15f,.15f);
+        public static readonly Vector3 HeadCenter = new Vector3(0,.27f,0), HeadRadii = new Vector3(.34f,.31f,.31f);
 
         const float Scale = 1.1f, HipHeight = .52f, SeatedHip = .50f;
         const float UpperArm = .24f, Forearm = .22f, Thigh = .20f, Shin = .19f;
-        static readonly Vector3 HeadCenter = new Vector3(0,.27f,0), HeadRadii = new Vector3(.34f,.31f,.31f);
+        static readonly Vector2[] TorsoProfile = {
+            new Vector2(0,.44f), new Vector2(.10f,.43f), new Vector2(.16f,.39f), new Vector2(.19f,.30f),
+            new Vector2(.20f,.16f), new Vector2(.20f,.02f), new Vector2(.18f,-.07f), new Vector2(.12f,-.12f), new Vector2(0,-.13f) };
 
         static readonly Dictionary<Color,Material> paints = new Dictionary<Color,Material>();
         static readonly Dictionary<string,Mesh> meshes = new Dictionary<string,Mesh>();
 
         Transform pelvis, head, shoulderL, shoulderR, elbowL, elbowR, hipL, hipR, kneeL, kneeR, ankleL, ankleR;
-        readonly List<Renderer> primaryParts = new List<Renderer>();
         readonly Dictionary<Renderer,bool> castsShadow = new Dictionary<Renderer,bool>();
-        Transform[] eyes; Vector3 eyeSize; GameObject[] highlights;
+        readonly List<Transform> blinkers = new List<Transform>();
+        readonly List<Vector3> blinkScales = new List<Vector3>();
+        readonly List<GameObject> shines = new List<GameObject>();
         GameObject mouthClosed, mouthOpen;
         int identity;
         float phase, seat;
@@ -72,80 +61,73 @@ namespace TheElevator
         Vector3 lastPosition, lastVelocity;
         bool tracking;
 
+        public BeanLook Look { get; private set; }
+        public Transform Pelvis { get { return pelvis; } }
         public Transform Head { get { return head; } }
         public Transform RightHand { get; private set; }
+        public Transform Shoulder(int side) { return side < 0 ? shoulderL : shoulderR; }
+        public Transform Elbow(int side) { return side < 0 ? elbowL : elbowR; }
+        public Transform Hand(int side) { return Elbow(side).Find("Hand"); }
+        public Transform Hip(int side) { return side < 0 ? hipL : hipR; }
+        public Transform Knee(int side) { return side < 0 ? kneeL : kneeR; }
+        public Transform Ankle(int side) { return side < 0 ? ankleL : ankleR; }
 
         public void Build(BeanLook look, int id)
         {
-            identity = id;
-            BeanOutfit outfit = look.Outfit;
+            identity = id; Look = look;
             Transform body = Group("Bean body", transform, Vector3.zero);
             body.localScale = Vector3.one * Scale;
             pelvis = Group("Pelvis", body, new Vector3(0, HipHeight, 0));
-            primaryParts.Add(Part(outfit == BeanOutfit.Crew ? "Coverall body" : "Outfit body", pelvis, Torso(), Vector3.zero, new Vector3(1,1,.82f), look.Primary));
+            Part("Outfit body", pelvis, Torso(), Vector3.zero, new Vector3(1,1,.82f), look.Primary);
 
             Transform neck = Group("Neck", pelvis, new Vector3(0,.40f,0));
             head = Group("Head", neck, Vector3.zero);
             Part("Head", head, Sphere(), HeadCenter, HeadRadii * 2, look.Skin);
             BuildFace(look);
 
-            Color forearm = look.Primary, hand = look.Skin, legs = Trousers;
-            switch (outfit)
-            {
-                case BeanOutfit.Crew:
-                    hand = Glove; legs = look.Primary;
-                    Part("Belt", pelvis, Band(), Vector3.zero, new Vector3(1,1,.82f), Cream);
-                    Part("ID badge", pelvis, Sphere(), new Vector3(-.09f,.24f,.158f), new Vector3(.06f,.075f,.018f), Cream);
-                    CrewHat(look.Hat, look.Accent);
-                    break;
-                case BeanOutfit.Office:
-                    Tie(look.Accent);
-                    Part("Badge", pelvis, Sphere(), new Vector3(-.105f,.21f,.158f), new Vector3(.05f,.065f,.015f), Cream);
-                    break;
-                case BeanOutfit.Reception:
-                    for (int side = -1; side <= 1; side += 2)
-                        Part("Blouse collar", pelvis, Sphere(), new Vector3(side * .055f,.37f,.12f), new Vector3(.10f,.055f,.04f), Cream)
-                            .transform.localRotation = Quaternion.Euler(0, 0, side * 30);
-                    Part("Name pin", pelvis, Sphere(), new Vector3(.10f,.24f,.158f), new Vector3(.07f,.035f,.015f), Gold);
-                    Headset(look.Accent);
-                    break;
-                case BeanOutfit.Technician:
-                    forearm = look.Skin; legs = WorkTrousers; // short-sleeved polo
-                    for (int side = -1; side <= 1; side += 2)
-                        Part("Polo collar", pelvis, Sphere(), new Vector3(side * .05f,.37f,.12f), new Vector3(.09f,.05f,.04f), Cream)
-                            .transform.localRotation = Quaternion.Euler(0, 0, side * 30);
-                    Part("Tool belt", pelvis, Band(), new Vector3(0,-.02f,0), new Vector3(1.04f,1.1f,.86f), Leather);
-                    Part("Tool pouch", pelvis, Sphere(), new Vector3(.15f,-.07f,.10f), new Vector3(.09f,.11f,.07f), Leather);
-                    Part("Tool pouch", pelvis, Sphere(), new Vector3(-.16f,-.07f,.08f), new Vector3(.08f,.10f,.07f), Leather);
-                    Part("Wrench handle", pelvis, Capsule(.10f,.012f,.012f), new Vector3(-.13f,.02f,.125f), Vector3.one, look.Accent);
-                    Part("Pocket pen", pelvis, Capsule(.06f,.008f,.008f), new Vector3(-.08f,.30f,.16f), Vector3.one, look.Accent);
-                    break;
-                case BeanOutfit.Clerk:
-                    Tie(look.Accent);
-                    for (int i = 0; i < 3; i++)
-                        Part("Cardigan button", pelvis, Sphere(), new Vector3(.055f,.20f - i * .08f,.162f), new Vector3(.025f,.025f,.012f), Cream);
-                    Glasses(Leather);
-                    break;
-                case BeanOutfit.Security:
-                    Tie(Boots);
-                    Part("Shield badge", pelvis, Sphere(), new Vector3(-.10f,.26f,.158f), new Vector3(.055f,.065f,.016f), Gold);
-                    Part("Shoulder radio", pelvis, Sphere(), new Vector3(.17f,.34f,.07f), new Vector3(.06f,.08f,.05f), Boots);
-                    Part("Radio antenna", pelvis, Capsule(.06f,.008f,.008f), new Vector3(.19f,.44f,.07f), Vector3.one, Boots)
-                        .transform.localRotation = Quaternion.Euler(180, 0, 0);
-                    Transform cap = Cap(look.Accent);
-                    Part("Cap badge", cap, Sphere(), new Vector3(0,.12f,.31f), new Vector3(.06f,.06f,.02f), Gold);
-                    break;
-            }
-
-            RightHand = Arm(1, look.Primary, forearm, hand, out shoulderR, out elbowR);
-            Arm(-1, look.Primary, forearm, hand, out shoulderL, out elbowL);
+            // The plain avatar wears a short-sleeved tee: bare forearms.
+            Color forearm = look.Outfit == BeanOutfit.Plain ? look.Skin : look.Primary, legs = Trousers;
+            DressJob(look, ref forearm, ref legs);
+            RightHand = Arm(1, look.Primary, forearm, look.Skin, out shoulderR, out elbowR);
+            Arm(-1, look.Primary, forearm, look.Skin, out shoulderL, out elbowL);
             Leg(-1, legs, out hipL, out kneeL, out ankleL);
             Leg(1, legs, out hipR, out kneeR, out ankleR);
         }
 
-        public void SetPrimary(Color color)
+        // ---- Builder API used by clothing -------------------------------------------------------------
+
+        public Renderer Add(Transform parent, string name, Mesh mesh, Vector3 position, Vector3 scale, Color color,
+            Quaternion? rotation = null, bool shadows = true)
+        { return Part(name, parent, mesh, position, scale, color, rotation, shadows); }
+
+        public void Repaint(string partName, Color color)
         {
-            foreach (Renderer part in primaryParts) part.sharedMaterial = Paint(color);
+            foreach (Renderer part in GetComponentsInChildren<Renderer>(true)) if (part.name == partName) part.sharedMaterial = Paint(color);
+        }
+
+        public Color ColorOf(string partName)
+        {
+            foreach (Renderer part in GetComponentsInChildren<Renderer>(true)) if (part.name == partName) return part.sharedMaterial.color;
+            return Look.Skin;
+        }
+
+        public Vector3 HeadPoint(float yaw, float pitch, out Vector3 normal) { return Surface(Direction(yaw, pitch), out normal); }
+        public Vector3 HeadPoint(Vector3 direction, out Vector3 normal) { return Surface(direction.normalized, out normal); }
+
+        public static float TorsoRadius(float y)
+        {
+            for (int i = 0; i < TorsoProfile.Length - 1; i++)
+                if (y <= TorsoProfile[i].y && y >= TorsoProfile[i + 1].y)
+                    return Mathf.Lerp(TorsoProfile[i].x, TorsoProfile[i + 1].x, Mathf.InverseLerp(TorsoProfile[i].y, TorsoProfile[i + 1].y, y));
+            return 0;
+        }
+
+        // A vertical line down the chest, `lift` in front of the torso surface (pelvis space).
+        public static Vector3[] FrontLine(float top, float bottom, float lift)
+        {
+            Vector3[] path = new Vector3[12];
+            for (int i = 0; i < path.Length; i++) { float y = Mathf.Lerp(top, bottom, i / 11f); path[i] = new Vector3(0, y, TorsoRadius(y) * .82f + lift); }
+            return path;
         }
 
         // First person: head and arms only cast the body's shadow; unshadowed face details are hidden outright.
@@ -162,13 +144,14 @@ namespace TheElevator
             }
         }
 
+        // ---- Body --------------------------------------------------------------------------------------
+
         Transform Arm(int side, Color sleeve, Color forearm, Color hand, out Transform shoulder, out Transform elbow)
         {
             shoulder = Group(side < 0 ? "Left shoulder" : "Right shoulder", pelvis, new Vector3(side * .20f, .33f, 0));
-            primaryParts.Add(Part("Upper sleeve", shoulder, Capsule(UpperArm,.058f,.054f), Vector3.zero, Vector3.one, sleeve));
+            Part("Upper sleeve", shoulder, Capsule(UpperArm,.058f,.054f), Vector3.zero, Vector3.one, sleeve);
             elbow = Group("Elbow", shoulder, new Vector3(0, -UpperArm, 0));
-            Renderer lower = Part("Forearm", elbow, Capsule(Forearm,.054f,.05f), Vector3.zero, Vector3.one, forearm);
-            if (forearm == sleeve) primaryParts.Add(lower);
+            Part("Forearm", elbow, Capsule(Forearm,.054f,.05f), Vector3.zero, Vector3.one, forearm);
             Transform wrist = Group("Hand", elbow, new Vector3(0, -Forearm, 0));
             Part("Mitten", wrist, Sphere(), new Vector3(0,-.05f,.005f), new Vector3(.13f,.15f,.10f), hand);
             Part("Thumb", wrist, Capsule(.05f,.026f,.022f), new Vector3(-side * .03f,-.03f,.035f), Vector3.one, hand)
@@ -179,37 +162,115 @@ namespace TheElevator
         void Leg(int side, Color trouser, out Transform hip, out Transform knee, out Transform ankle)
         {
             hip = Group(side < 0 ? "Left hip" : "Right hip", pelvis, new Vector3(side * .105f, -.04f, 0));
-            Renderer upper = Part("Thigh", hip, Capsule(Thigh,.07f,.066f), Vector3.zero, Vector3.one, trouser);
+            Part("Thigh", hip, Capsule(Thigh,.07f,.066f), Vector3.zero, Vector3.one, trouser);
             knee = Group("Knee", hip, new Vector3(0, -Thigh, 0));
-            Renderer lower = Part("Shin", knee, Capsule(Shin,.066f,.062f), Vector3.zero, Vector3.one, trouser);
-            if (trouser != Trousers && trouser != WorkTrousers) { primaryParts.Add(upper); primaryParts.Add(lower); }
+            Part("Shin", knee, Capsule(Shin,.066f,.062f), Vector3.zero, Vector3.one, trouser);
             ankle = Group("Ankle", knee, new Vector3(0, -Shin, 0));
-            Part("Boot", ankle, Sphere(), new Vector3(0,-.03f,.04f), new Vector3(.17f,.14f,.26f), Boots);
+            Part("Boot", ankle, Sphere(), new Vector3(0,-.03f,.04f), new Vector3(.17f,.14f,.26f), Shoes);
         }
+
+        // ---- Face: 6 eyes, 6 mouths, 6 brows (0 = none), 6 glasses (0 = none) -------------------------
 
         void BuildFace(BeanLook look)
         {
-            eyeSize = look.Eyes == 1 ? new Vector3(.09f,.09f,.03f) : look.Eyes == 2 ? new Vector3(.095f,.052f,.03f) : new Vector3(.078f,.125f,.03f);
-            eyes = new Transform[2]; highlights = new GameObject[2];
+            BuildEyes(look.Eyes % 6);
+            BuildMouth(look.Mouth % 6);
+            BuildBrows(look.Brows % 6);
+            BuildGlasses(look.Glasses % 6);
+            mouthOpen = Feature("Talking mouth", -16, new Vector3(.06f,.048f,.02f));
+            mouthOpen.SetActive(false);
+        }
+
+        void BuildEyes(int style)
+        {
+            for (int side = -1; side <= 1; side += 2)
+            {
+                Vector3 point = Surface(Direction(side * 16, 6), out Vector3 normal);
+                Quaternion facing = Quaternion.LookRotation(normal, Vector3.up);
+                if (style == 3)
+                {
+                    Transform arc = Part("Happy eye", head, Arc("Happy eye", .09f, .045f, .013f), point + normal * .01f, Vector3.one, FaceInk, facing, false).transform;
+                    blinkers.Add(arc); blinkScales.Add(Vector3.one);
+                    continue;
+                }
+                Vector3 size = style == 1 ? new Vector3(.09f,.09f,.03f) : style == 2 ? new Vector3(.095f,.052f,.03f)
+                    : style == 4 ? new Vector3(.095f,.14f,.03f) : style == 5 ? new Vector3(.05f,.05f,.03f) : new Vector3(.078f,.125f,.03f);
+                blinkers.Add(Part("Eye", head, Sphere(), point + normal * .006f, size, FaceInk, facing, false).transform);
+                blinkScales.Add(size);
+                if (style == 2 || style == 5) continue;
+                shines.Add(Part("Eye shine", head, Sphere(), point + normal * .02f + facing * new Vector3(size.x * .22f, size.y * .24f, 0),
+                    Vector3.one * (style == 4 ? .036f : .026f), Color.white, facing, false).gameObject);
+                if (style == 4)
+                    shines.Add(Part("Eye shine", head, Sphere(), point + normal * .02f + facing * new Vector3(-size.x * .2f, -size.y * .22f, 0),
+                        Vector3.one * .016f, Color.white, facing, false).gameObject);
+            }
+        }
+
+        void BuildMouth(int style)
+        {
+            switch (style)
+            {
+                case 1: mouthClosed = Feature("Small round mouth", -15, new Vector3(.042f,.034f,.02f)); break;
+                case 2: mouthClosed = SmilePart(8, .5f, 0); break;
+                case 3: mouthClosed = SmilePart(14, 7, 0); break;
+                case 4:
+                    mouthClosed = Group("Laughing mouth", head, Vector3.zero).gameObject;
+                    Vector3 point = Surface(Direction(0, -16), out Vector3 normal);
+                    Quaternion facing = Quaternion.LookRotation(normal, Vector3.up);
+                    Part("Open mouth", mouthClosed.transform, Sphere(), point + normal * .004f, new Vector3(.10f,.065f,.02f), FaceInk, facing, false);
+                    Part("Tongue", mouthClosed.transform, Sphere(), point + normal * .012f + facing * new Vector3(0,-.014f,0), new Vector3(.05f,.026f,.012f), new Color(.95f,.45f,.5f), facing, false);
+                    break;
+                case 5: mouthClosed = SmilePart(10, 3, 4); break;
+                default: mouthClosed = SmilePart(11, 4.5f, 0); break;
+            }
+        }
+
+        GameObject SmilePart(float half, float curve, float tilt)
+        { return Part("Smile", head, Smile(half, curve, tilt), Vector3.zero, Vector3.one, FaceInk, Quaternion.identity, false).gameObject; }
+
+        void BuildBrows(int style)
+        {
+            if (style == 0) return;
+            for (int side = -1; side <= 1; side += 2)
+            {
+                Vector3 point = Surface(Direction(side * 16, 25), out Vector3 normal);
+                Quaternion facing = Quaternion.LookRotation(normal, Vector3.up);
+                if (style == 2) { Part("Eyebrow", head, Arc("Arched brow", .085f, .018f, .01f), point + normal * .008f, Vector3.one, FaceInk, facing, false); continue; }
+                float roll = style == 3 ? -side * 20 : style == 4 ? side * 22 : side * -6;
+                Vector3 size = style == 5 ? new Vector3(.105f,.038f,.022f) : new Vector3(.075f,.02f,.02f);
+                Part("Eyebrow", head, Sphere(), point + normal * .01f, size, FaceInk, facing * Quaternion.Euler(0, 0, roll), false);
+            }
+        }
+
+        void BuildGlasses(int style)
+        {
+            if (style == 0) return;
+            Color frame = style == 1 ? new Color(.36f,.22f,.14f) : style == 5 ? new Color(1f,.78f,.25f) : FaceInk;
+            float ring = style == 4 ? .092f : .074f, thickness = style == 4 ? .016f : .01f;
+            Vector3[] centers = new Vector3[2];
             for (int i = 0; i < 2; i++)
             {
                 int side = i == 0 ? -1 : 1;
                 Vector3 point = Surface(Direction(side * 16, 6), out Vector3 normal);
                 Quaternion facing = Quaternion.LookRotation(normal, Vector3.up);
-                eyes[i] = Part("Eye", head, Sphere(), point + normal * .006f, eyeSize, FaceInk, facing, false).transform;
-                highlights[i] = Part("Eye shine", head, Sphere(), point + normal * .02f + facing * new Vector3(eyeSize.x * .22f, eyeSize.y * .24f, 0),
-                    new Vector3(.026f,.026f,.008f), Color.white, facing, false).gameObject;
-                if (look.Eyes == 2) highlights[i].SetActive(false);
+                centers[i] = point + normal * .035f;
+                if (style == 5 && side < 0) continue;
+                if (style == 2) Part("Glasses frame", head, SquareFrame(), centers[i], Vector3.one, frame, facing, false);
+                else Part("Glasses frame", head, Torus(ring, thickness), centers[i], Vector3.one, frame, facing * Quaternion.Euler(90,0,0), false);
+                if (style == 3)
+                {
+                    Part("Dark lens", head, Sphere(), centers[i] - normal * .004f, new Vector3(.145f,.145f,.012f), new Color(.1f,.12f,.2f), facing, false);
+                    Part("Lens glint", head, Sphere(), centers[i] + normal * .004f + facing * new Vector3(.03f,.03f,0), new Vector3(.03f,.018f,.006f), Color.white, facing * Quaternion.Euler(0,0,35), false);
+                }
+                if (style == 5)
+                {
+                    Vector3 cheek = Surface(Direction(side * 40, -25), out Vector3 cheekNormal) + cheekNormal * .01f;
+                    Part("Monocle chain", head, Tube("Monocle chain", new[] { centers[i] + facing * new Vector3(ring, 0, 0), Vector3.Lerp(centers[i], cheek, .5f) + Vector3.down * .04f, cheek }, .005f), Vector3.zero, Vector3.one, frame, null, false);
+                }
             }
-            int mouth = look.Mouth % 4;
-            if (mouth == 1) mouthClosed = Feature("Small round mouth", -15, new Vector3(.042f,.034f,.02f));
-            else
-            {
-                float half = mouth == 2 ? 8 : mouth == 3 ? 14 : 11, curve = mouth == 2 ? .5f : mouth == 3 ? 7 : 4.5f;
-                mouthClosed = Part("Smile", head, Smile(half, curve), Vector3.zero, Vector3.one, FaceInk, Quaternion.identity, false).gameObject;
-            }
-            mouthOpen = Feature("Talking mouth", -16, new Vector3(.06f,.048f,.02f));
-            mouthOpen.SetActive(false);
+            if (style == 5) return;
+            Vector3 from = centers[0] + Vector3.right * ring, to = centers[1] - Vector3.right * ring;
+            Part("Glasses bridge", head, Capsule(.05f,.008f,.008f), from, new Vector3(1, (to - from).magnitude / .05f, 1), frame, Quaternion.FromToRotation(Vector3.down, to - from), false);
         }
 
         GameObject Feature(string name, float pitch, Vector3 size)
@@ -218,107 +279,7 @@ namespace TheElevator
             return Part(name, head, Sphere(), point + normal * .004f, size, FaceInk, Quaternion.LookRotation(normal, Vector3.up), false).gameObject;
         }
 
-        void Tie(Color color)
-        {
-            Part("Shirt front", pelvis, Sphere(), new Vector3(0,.30f,.135f), new Vector3(.12f,.18f,.05f), Cream);
-            Part("Tie knot", pelvis, Sphere(), new Vector3(0,.365f,.166f), new Vector3(.04f,.036f,.03f), color);
-            Part("Tie", pelvis, Capsule(.13f,.018f,.024f), new Vector3(0,.35f,.168f), new Vector3(1,1,.45f), color);
-        }
-
-        void CrewHat(int style, Color color)
-        {
-            switch (style % 4)
-            {
-                case 1: Beanie(color); break;
-                case 2: Cap(color); break;
-                case 3: Goggles(color); break;
-                default: HardHat(color); break;
-            }
-        }
-
-        void Beanie(Color color)
-        {
-            Transform hat = Group("Beanie", head, HeadCenter + new Vector3(0,.02f,0));
-            Part("Knit dome", hat, Lathe("Beanie dome", Dome(.36f,.33f,68)), Vector3.zero, new Vector3(1,1,.91f), color);
-            Part("Folded cuff", hat, Lathe("Beanie cuff", new[] {
-                new Vector2(.33f,.05f), new Vector2(.358f,.045f), new Vector2(.364f,0), new Vector2(.358f,-.035f), new Vector2(.33f,-.04f) }),
-                new Vector3(0,.10f,0), new Vector3(1,1,.91f), color);
-            Part("Pompom", hat, Sphere(), new Vector3(0,.35f,0), Vector3.one * .12f, Cream);
-        }
-
-        Transform Cap(Color color)
-        {
-            Transform hat = Group("Cap", head, HeadCenter + new Vector3(0,.03f,0));
-            Part("Cap crown", hat, Lathe("Cap crown", Dome(.36f,.33f,62)), Vector3.zero, new Vector3(1,1,.93f), color);
-            Part("Cap button", hat, Sphere(), new Vector3(0,.33f,0), Vector3.one * .05f, color);
-            Part("Cap visor", hat, Sphere(), new Vector3(0,.15f,.36f), new Vector3(.30f,.03f,.24f), color)
-                .transform.localRotation = Quaternion.Euler(8, 0, 0);
-            return hat;
-        }
-
-        void Goggles(Color strap)
-        {
-            Transform hat = Group("Goggles", head, HeadCenter + new Vector3(0,.13f,0));
-            Part("Goggle strap", hat, Lathe("Goggle strap", new[] {
-                new Vector2(.305f,.03f), new Vector2(.318f,.025f), new Vector2(.322f,0), new Vector2(.318f,-.025f), new Vector2(.305f,-.03f) }),
-                Vector3.zero, new Vector3(1,1,.91f), strap);
-            for (int side = -1; side <= 1; side += 2)
-            {
-                Vector3 point = Surface(Direction(side * 15, 25), out Vector3 normal);
-                Quaternion facing = Quaternion.LookRotation(normal, Vector3.up);
-                Part("Goggle rim", head, Sphere(), point + normal * .02f, new Vector3(.12f,.10f,.06f), strap, facing);
-                Part("Goggle lens", head, Sphere(), point + normal * .04f, new Vector3(.09f,.075f,.03f), Lens, facing, false);
-            }
-        }
-
-        void Headset(Color color)
-        {
-            Vector3[] band = new Vector3[17];
-            for (int i = 0; i < band.Length; i++)
-            {
-                float angle = Mathf.Lerp(-82, 82, i / (band.Length - 1f)) * Mathf.Deg2Rad;
-                Vector3 point = Surface(new Vector3(Mathf.Sin(angle), Mathf.Cos(angle), -.05f).normalized, out Vector3 normal);
-                band[i] = point + normal * .02f;
-            }
-            Part("Headset band", head, Tube("Headset band", band, .014f), Vector3.zero, Vector3.one, color);
-            Vector3 cup = Vector3.zero;
-            for (int side = -1; side <= 1; side += 2)
-            {
-                Vector3 point = Surface(new Vector3(side, .02f, -.05f).normalized, out Vector3 normal);
-                Part("Ear cup", head, Sphere(), point + normal * .02f, new Vector3(.09f,.11f,.06f), color, Quaternion.LookRotation(normal, Vector3.up));
-                if (side < 0) cup = point + normal * .03f;
-            }
-            Vector3 mouth = Surface(Direction(-22, -16), out Vector3 mouthNormal) + mouthNormal * .04f;
-            Vector3 start = cup + new Vector3(0,-.03f,.03f), reach = mouth - start;
-            Part("Mic boom", head, Capsule(.2f,.008f,.008f), start, new Vector3(1, reach.magnitude / .2f, 1), FaceInk, Quaternion.FromToRotation(Vector3.down, reach), false);
-            Part("Mic", head, Sphere(), mouth, Vector3.one * .035f, FaceInk, null, false);
-        }
-
-        void Glasses(Color frame)
-        {
-            Vector3[] centers = new Vector3[2]; Vector3 right = Vector3.right;
-            for (int i = 0; i < 2; i++)
-            {
-                Vector3 point = Surface(Direction((i == 0 ? -1 : 1) * 16, 6), out Vector3 normal);
-                centers[i] = point + normal * .035f;
-                Part("Glasses rim", head, Torus(.072f,.01f), centers[i], Vector3.one, frame, Quaternion.LookRotation(normal, Vector3.up) * Quaternion.Euler(90,0,0), false);
-            }
-            Vector3 from = centers[0] + right * .07f, to = centers[1] - right * .07f;
-            Part("Glasses bridge", head, Capsule(.05f,.008f,.008f), from, new Vector3(1, (to - from).magnitude / .05f, 1), frame, Quaternion.FromToRotation(Vector3.down, to - from), false);
-        }
-
-        void HardHat(Color color)
-        {
-            Transform hat = Group("Hard hat", head, HeadCenter + new Vector3(0,.13f,-.01f));
-            hat.localRotation = Quaternion.Euler(-7, 0, 0);
-            Part("Hat dome", hat, Lathe("Hat dome", new[] {
-                new Vector2(0,.20f), new Vector2(.15f,.18f), new Vector2(.27f,.12f), new Vector2(.345f,.03f),
-                new Vector2(.355f,0), new Vector2(.355f,0), new Vector2(0,0) }), Vector3.zero, Vector3.one, color);
-            Part("Hat brim", hat, Lathe("Hat brim", new[] {
-                new Vector2(0,.014f), new Vector2(.37f,.014f), new Vector2(.385f,0), new Vector2(.37f,-.014f), new Vector2(0,-.014f) }),
-                new Vector3(0,.005f,.04f), new Vector3(.96f,1,1.1f), color);
-            Part("Hat ridge", hat, Sphere(), new Vector3(0,.175f,0), new Vector3(.08f,.07f,.44f), color);
-        }
+        // ---- Animation ---------------------------------------------------------------------------------
 
         public void Animate(float dt, BeanPose pose)
         {
@@ -359,7 +320,8 @@ namespace TheElevator
             head.localRotation = gaze * Quaternion.Euler(bob.x + Mathf.Sin(phase * 2) * walk * 2.5f, 0, bob.y + breathe * .6f);
 
             float blink = (clock + identity * .71f) % 4.3f < .11f ? .12f : 1;
-            for (int i = 0; i < 2; i++) eyes[i].localScale = new Vector3(eyeSize.x, eyeSize.y * blink, eyeSize.z);
+            for (int i = 0; i < blinkers.Count; i++) { Vector3 s = blinkScales[i]; blinkers[i].localScale = new Vector3(s.x, s.y * blink, s.z); }
+            foreach (GameObject shine in shines) shine.SetActive(blink == 1);
             bool open = talking && Mathf.Sin(clock * 17 + identity) > 0;
             mouthClosed.SetActive(!open); mouthOpen.SetActive(open);
         }
@@ -401,6 +363,8 @@ namespace TheElevator
             elbowR.rotation = Quaternion.FromToRotation(Vector3.down, target - elbow);
         }
 
+        // ---- Helpers -----------------------------------------------------------------------------------
+
         Vector3 Surface(Vector3 direction, out Vector3 normal)
         {
             Vector3 r = HeadRadii;
@@ -418,7 +382,7 @@ namespace TheElevator
 
         static float Sq(float v) { return v * v; }
 
-        static Transform Group(string name, Transform parent, Vector3 position)
+        public static Transform Group(string name, Transform parent, Vector3 position)
         {
             Transform t = new GameObject(name).transform;
             t.SetParent(parent, false);
@@ -452,7 +416,9 @@ namespace TheElevator
             return material;
         }
 
-        static Mesh Sphere()
+        // ---- Shared meshes -----------------------------------------------------------------------------
+
+        public static Mesh Sphere()
         {
             Vector2[] profile = new Vector2[17];
             for (int i = 0; i < profile.Length; i++)
@@ -463,21 +429,16 @@ namespace TheElevator
             return Lathe("Bean sphere", profile);
         }
 
-        static Mesh Torso()
-        {
-            return Lathe("Bean torso", new[] {
-                new Vector2(0,.44f), new Vector2(.10f,.43f), new Vector2(.16f,.39f), new Vector2(.19f,.30f),
-                new Vector2(.20f,.16f), new Vector2(.20f,.02f), new Vector2(.18f,-.07f), new Vector2(.12f,-.12f), new Vector2(0,-.13f) });
-        }
+        public static Mesh Torso() { return Lathe("Bean torso", TorsoProfile); }
 
-        static Mesh Band()
+        public static Mesh Band()
         {
             return Lathe("Bean belt", new[] {
                 new Vector2(.19f,.035f), new Vector2(.212f,.03f), new Vector2(.216f,0), new Vector2(.212f,-.03f), new Vector2(.19f,-.035f) });
         }
 
         // Pivot at the top joint so neighbouring segments overlap into one smooth noodle.
-        static Mesh Capsule(float length, float top, float bottom)
+        public static Mesh Capsule(float length, float top, float bottom)
         {
             const int cap = 6;
             Vector2[] profile = new Vector2[cap * 2];
@@ -491,33 +452,67 @@ namespace TheElevator
             return Lathe("Noodle " + length + "/" + top + "/" + bottom, profile);
         }
 
-        static Mesh Smile(float halfYaw, float curve)
+        public static Mesh Box(Vector3 size, float radius)
+        {
+            string key = "Box " + size + "/" + radius;
+            if (meshes.TryGetValue(key, out Mesh cached) && cached) return cached;
+            Mesh mesh = TheElevator.SoftOffice.SoftArt.Rounded(size, radius);
+            mesh.hideFlags = HideFlags.DontSave; meshes[key] = mesh;
+            return mesh;
+        }
+
+        static Mesh Smile(float halfYaw, float curve, float tilt)
         {
             Vector3[] path = new Vector3[17];
             for (int r = 0; r < path.Length; r++)
             {
                 float u = r / (path.Length - 1f) * 2 - 1;
-                Vector3 d = Direction(u * halfYaw, -13 - curve * (1 - u * u));
+                Vector3 d = Direction(u * halfYaw, -13 - curve * (1 - u * u) + tilt * u);
                 float t = 1 / Mathf.Sqrt(Sq(d.x / HeadRadii.x) + Sq(d.y / HeadRadii.y) + Sq(d.z / HeadRadii.z));
                 path[r] = HeadCenter + d * (t + .004f);
             }
-            return Tube("Smile " + halfYaw + "/" + curve, path, .011f);
+            return Tube("Smile " + halfYaw + "/" + curve + "/" + tilt, path, .011f);
         }
 
-        // A round tube along a path, pinched closed at both ends.
-        static Mesh Tube(string key, Vector3[] path, float radius)
+        // An upside-down U in a feature's local plane (x right, y up): happy eyes, arched brows.
+        static Mesh Arc(string key, float width, float height, float radius)
+        {
+            Vector3[] path = new Vector3[13];
+            for (int i = 0; i < path.Length; i++) { float u = i / 12f * 2 - 1; path[i] = new Vector3(u * width * .5f, (1 - u * u) * height - height * .5f, 0); }
+            return Tube(key, path, radius);
+        }
+
+        static Mesh SquareFrame()
+        {
+            const float w = .075f, h = .06f, corner = .025f;
+            var path = new List<Vector3>();
+            Vector2[] centers = { new Vector2(w - corner, h - corner), new Vector2(-w + corner, h - corner), new Vector2(-w + corner, -h + corner), new Vector2(w - corner, -h + corner) };
+            for (int c = 0; c < 4; c++)
+                for (int i = 0; i < 5; i++)
+                {
+                    float a = (c * 90 + i * 22.5f) * Mathf.Deg2Rad;
+                    path.Add(new Vector3(centers[c].x + Mathf.Cos(a) * corner, centers[c].y + Mathf.Sin(a) * corner, 0));
+                }
+            return Tube("Square glasses", path.ToArray(), .01f, true);
+        }
+
+        // A round tube along a path; open paths pinch closed at both ends, closed loops wrap around.
+        public static Mesh Tube(string key, Vector3[] path, float radius, bool closed = false)
         {
             if (meshes.TryGetValue(key, out Mesh cached) && cached) return cached;
             const int sides = 8;
-            int rings = path.Length;
+            int rings = path.Length, segments = closed ? rings : rings - 1;
             var vertices = new Vector3[rings * sides];
-            var triangles = new int[(rings - 1) * sides * 6];
+            var triangles = new int[segments * sides * 6];
             for (int r = 0; r < rings; r++)
             {
-                Vector3 tangent = (path[Mathf.Min(r + 1, rings - 1)] - path[Mathf.Max(r - 1, 0)]).normalized;
+                Vector3 next = closed ? path[(r + 1) % rings] : path[Mathf.Min(r + 1, rings - 1)];
+                Vector3 previous = closed ? path[(r + rings - 1) % rings] : path[Mathf.Max(r - 1, 0)];
+                Vector3 tangent = (next - previous).normalized;
                 Vector3 across = Vector3.Cross(tangent, Vector3.forward).normalized;
+                if (across.sqrMagnitude < .1f) across = Vector3.Cross(tangent, Vector3.up).normalized;
                 Vector3 normal = Vector3.Cross(across, tangent);
-                float round = radius * Mathf.Pow(Mathf.Max(0, Mathf.Sin(Mathf.PI * r / (rings - 1f))), .35f);
+                float round = closed ? radius : radius * Mathf.Pow(Mathf.Max(0, Mathf.Sin(Mathf.PI * r / (rings - 1f))), .35f);
                 for (int k = 0; k < sides; k++)
                 {
                     float angle = k * Mathf.PI * 2 / sides;
@@ -525,10 +520,10 @@ namespace TheElevator
                 }
             }
             int n = 0;
-            for (int r = 0; r < rings - 1; r++)
+            for (int r = 0; r < segments; r++)
                 for (int k = 0; k < sides; k++)
                 {
-                    int a = r * sides + k, b = r * sides + (k + 1) % sides, c = a + sides, d = b + sides;
+                    int a = r * sides + k, b = r * sides + (k + 1) % sides, c = (r + 1) % rings * sides + k, d = (r + 1) % rings * sides + (k + 1) % sides;
                     triangles[n++] = a; triangles[n++] = c; triangles[n++] = b;
                     triangles[n++] = b; triangles[n++] = c; triangles[n++] = d;
                 }
@@ -540,7 +535,7 @@ namespace TheElevator
         }
 
         // Open-bottomed cap of a sphere, from the crown down to `degrees` from the top; sits over the head.
-        static Vector2[] Dome(float radius, float height, float degrees)
+        public static Vector2[] Dome(float radius, float height, float degrees)
         {
             Vector2[] profile = new Vector2[8];
             for (int i = 0; i < profile.Length; i++)
@@ -551,7 +546,7 @@ namespace TheElevator
             return profile;
         }
 
-        static Mesh Torus(float ring, float thickness)
+        public static Mesh Torus(float ring, float thickness)
         {
             Vector2[] profile = new Vector2[13];
             for (int i = 0; i < profile.Length; i++)
@@ -564,7 +559,7 @@ namespace TheElevator
 
         // Revolves a (radius, height) profile, listed top to bottom, around Y with analytic smooth normals.
         // A repeated profile point makes a crease; a zero radius closes a pole.
-        static Mesh Lathe(string key, Vector2[] profile)
+        public static Mesh Lathe(string key, Vector2[] profile)
         {
             if (meshes.TryGetValue(key, out Mesh cached) && cached) return cached;
             const int sides = 24;

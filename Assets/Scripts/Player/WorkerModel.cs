@@ -4,30 +4,34 @@ namespace TheElevator
 {
     public sealed class WorkerModel : MonoBehaviour
     {
-        public static readonly Color[] SuitColors = {
-            Workshop.Yellow, Workshop.Mint, new Color(0.73f, 0.53f, 0.91f), Workshop.Red
-        };
         BeanRig rig;
-        int suit;
         bool firstPerson, crouched, applied;
 
-        // First-person hands copy the body's gloves and sleeves.
-        public Color HandColor { get { return BeanRig.Glove; } }
-        public Color SleeveColor { get { return BeanRig.CrewLook(suit).Primary; } }
+        public AvatarLoadout Loadout { get; private set; }
+        // Bumped on every rebuild so the first-person hands can re-read their colors.
+        public int Version { get; private set; }
+        public Color HandColor { get { return rig.ColorOf("Mitten"); } }
+        public Color SleeveColor { get { return rig.ColorOf("Forearm"); } }
 
         public void UseOfficeRig(TheElevator.Office.OfficeArt art) { }
 
-        public void Build(Workshop w, int colorIndex) { SetColor(colorIndex); }
+        public void Build(Workshop w, int colorIndex) { Apply(AvatarLoadout.Load()); }
 
-        // Each uniform is a whole crew look (suit, skin, face and headwear), one per future co-op player.
-        public void SetColor(int index)
+        // Rebuilds the plain avatar and layers the loadout's cosmetics on top.
+        public void Apply(AvatarLoadout loadout)
         {
-            suit = index;
-            if (rig) DestroyImmediate(rig.gameObject);
-            GameObject root = new GameObject("Crew body");
+            Loadout = loadout.Clone();
+            if (rig)
+            {
+                rig.gameObject.SetActive(false);
+                if (Application.isPlaying) Destroy(rig.gameObject); else DestroyImmediate(rig.gameObject);
+            }
+            GameObject root = new GameObject("Avatar");
             root.transform.SetParent(transform, false);
             rig = root.AddComponent<BeanRig>();
-            rig.Build(BeanRig.CrewLook(index), 4 + index);
+            rig.Build(AvatarWardrobe.Look(Loadout), 4);
+            AvatarWardrobe.Dress(rig, Loadout);
+            Version++;
             applied = false;
             SetView(firstPerson, crouched);
         }

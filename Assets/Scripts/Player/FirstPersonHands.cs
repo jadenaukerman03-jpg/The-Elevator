@@ -17,6 +17,7 @@ namespace TheElevator
         Mesh palmMesh;
         WorkerController player;
         float transition,releaseMotion;
+        int outfitVersion=-1;
         SalvageItem previous;
         public string GripName { get; private set; }
         public float MaxContactError { get; private set; }
@@ -55,6 +56,7 @@ namespace TheElevator
         public void Present(SalvageItem held,bool visible,float dt)
         {
             gameObject.SetActive(visible);if(!visible)return;
+            if(outfitVersion!=player.Model.Version){outfitVersion=player.Model.Version;skin.color=player.Model.HandColor;sleeve.color=player.Model.SleeveColor;}
             if(held!=previous){if(previous&&!held)releaseMotion=1;transition=0;previous=held;}transition=Mathf.MoveTowards(transition,1,dt*5);releaseMotion=Mathf.MoveTowards(releaseMotion,0,dt*4);
             MaxContactError=0;
             if(held)
