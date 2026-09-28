@@ -13,6 +13,8 @@ namespace TheElevator
             public Vector3 Bend = BeanRig.RelaxedHand;
         }
         const float PalmHalfThickness = .042f, FingerHinge = .055f;
+        // Palm flat on the side face, fingers straight to the near edge, then folded over it.
+        static readonly Vector3 WrapHand = new Vector3(6, 88, 45);
         Hand left,right;
         Material skin,sleeve;
         WorkerController player;
@@ -72,7 +74,7 @@ namespace TheElevator
                 Grip(side,held,shape,out Vector3 gripPosition,out Quaternion gripRotation);
                 float t=Mathf.SmoothStep(0,1,reach);
                 position=Vector3.Lerp(position,gripPosition,t);rotation=Quaternion.Slerp(rotation,gripRotation,t);
-                bend=Vector3.Lerp(BeanRig.RelaxedHand,BeanRig.GripHand,Mathf.SmoothStep(0,1,Mathf.InverseLerp(.5f,1,reach)));
+                bend=Vector3.Lerp(BeanRig.RelaxedHand,WrapHand,Mathf.SmoothStep(0,1,Mathf.InverseLerp(.5f,1,reach)));
             }
             hand.Root.SetPositionAndRotation(position,rotation);
             if((bend-hand.Bend).sqrMagnitude>.25f){hand.Bend=bend;BeanRig.Mitten(hand.Mesh,bend,side);}

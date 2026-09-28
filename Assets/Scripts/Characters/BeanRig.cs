@@ -57,7 +57,7 @@ namespace TheElevator
         MeshFilter mittenL, mittenR;
         Vector3 handPose = RelaxedHand;
         int identity;
-        float phase, seat, pace;
+        float phase, seat, pace, clock;
         Quaternion gaze = Quaternion.identity;
         Vector2 bob, bobVelocity;
         Vector3 lastPosition, lastVelocity;
@@ -287,7 +287,8 @@ namespace TheElevator
         public void Animate(float dt, BeanPose pose)
         {
             if (!pelvis) return;
-            float clock = Application.isPlaying ? Time.time : 0;
+            // Own clock: idle motion runs from the frame times it is given, so it also plays in paused previews and edit-mode renders.
+            clock += Mathf.Min(dt, .1f);
             // Smoothed ground speed; cadence follows stride length so fast running lengthens strides instead of flailing.
             pace = Mathf.MoveTowards(pace, pose.Speed, dt * 12);
             float walk = Mathf.Clamp01(pace / 1.2f), run = Mathf.SmoothStep(0, 1, Mathf.InverseLerp(2.4f, 4.8f, pace)), idle = 1 - walk;
@@ -354,7 +355,7 @@ namespace TheElevator
 
         // ---- One-piece mitten: knuckle, finger and thumb bends of a single continuous surface ----------
 
-        public static readonly Vector3 RelaxedHand = new Vector3(12, 18, 10), GripHand = new Vector3(20, 85, 40);
+        public static readonly Vector3 RelaxedHand = new Vector3(12, 18, 10), GripHand = new Vector3(38, 68, 45);
 
         void SetHands(Vector3 bend)
         {
@@ -379,7 +380,7 @@ namespace TheElevator
         public static void Mitten(Mesh mesh, Vector3 bend, int side)
         {
             const int rings = 18, segments = 24;
-            Vector3 thumbBase = new Vector3(-side * .045f, -.03f, .01f), thumbOut = new Vector3(-side, .5f, .35f).normalized;
+            Vector3 thumbBase = new Vector3(-side * .045f, -.03f, .01f), thumbOut = new Vector3(-side, .75f, .3f).normalized;
             Vector3 knuckle = new Vector3(0, .02f, .042f), middle = new Vector3(0, .055f, .042f), thumbPivot = new Vector3(-side * .035f, -.045f, .02f);
             Quaternion knuckleTurn = Quaternion.Euler(bend.x, 0, 0), middleTurn = Quaternion.Euler(bend.y, 0, 0);
             var vertices = new Vector3[(rings - 1) * segments + 2];
@@ -415,12 +416,12 @@ namespace TheElevator
             Vector3 Deform(Vector3 p)
             {
                 // Thumb: a smooth lobe grown out of the palm edge, then swung toward the palm about its root.
-                float thumb = Mathf.Exp(-(p - thumbBase).sqrMagnitude / (.028f * .028f));
-                p += thumbOut * .04f * thumb;
+                float thumb = Mathf.Exp(-(p - thumbBase).sqrMagnitude / (.05f * .05f));
+                p += thumbOut * .05f * thumb * thumb * (3 - 2 * thumb);
                 if (thumb > .05f) p = thumbPivot + Quaternion.Euler(0, side * bend.z * thumb, 0) * (p - thumbPivot);
                 // Fingers: two soft hinges across the width; the finger block is everything past the knuckle line.
-                float finger = (1 - thumb) * Mathf.SmoothStep(0, 1, Mathf.InverseLerp(.005f, .035f, p.y));
-                float tip = (1 - thumb) * Mathf.SmoothStep(0, 1, Mathf.InverseLerp(.045f, .07f, p.y));
+                float finger = (1 - thumb) * Mathf.SmoothStep(0, 1, Mathf.InverseLerp(0f, .045f, p.y));
+                float tip = (1 - thumb) * Mathf.SmoothStep(0, 1, Mathf.InverseLerp(.035f, .085f, p.y));
                 Vector3 original = p;
                 p = middle + Quaternion.Slerp(Quaternion.identity, middleTurn, tip) * (p - middle);
                 p = knuckle + Quaternion.Slerp(Quaternion.identity, knuckleTurn, finger) * (p - knuckle);
