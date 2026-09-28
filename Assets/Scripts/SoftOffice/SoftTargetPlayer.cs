@@ -5,14 +5,16 @@ namespace TheElevator.SoftOffice
  {
   public Camera View {get;private set;} public SoftPickup Held {get;private set;}
   public Transform LeftHand,RightHand;
+  public SoftRobot Body {get;private set;}
   CharacterController motor;SoftPickup target;float yaw,pitch=8,vertical,charge;Vector3 velocity;bool locked=true;
   public void Build(SoftArt a)
   {
    gameObject.layer=2;motor=gameObject.AddComponent<CharacterController>();motor.height=1.65f;motor.center=Vector3.up*.825f;motor.radius=.32f;
    View=a.Group(transform,"Relaxed first person view",new Vector3(0,1.5f,0)).gameObject.AddComponent<Camera>();View.tag="MainCamera";View.fieldOfView=74;View.nearClipPlane=.06f;View.farClipPlane=60;View.backgroundColor=new Color(.70f,.81f,.83f);View.clearFlags=CameraClearFlags.SolidColor;View.gameObject.AddComponent<AudioListener>();
+   var avatar=a.Group(transform,"Complete player body",new Vector3(0,0,-.28f));avatar.localScale=new Vector3(.9f,1,.8f);avatar.localRotation=Quaternion.Euler(0,180,0);Body=avatar.gameObject.AddComponent<SoftRobot>();Body.Build(a,0);Body.ConfigureAsPlayer();
    LeftHand=Hand(a,-1);RightHand=Hand(a,1);Cursor.lockState=CursorLockMode.Locked;Cursor.visible=false;
   }
-  Transform Hand(SoftArt a,int side){var t=a.Group(View.transform,side<0?"Left bubbly glove":"Right bubbly glove",Vector3.zero);a.Round(t,"Soft robot palm",Vector3.zero,new Vector3(.145f,.17f,.085f),a.Cream,.04f);for(int i=0;i<4;i++)a.Round(t,"Rounded glove finger",new Vector3(-.051f+i*.034f,.102f,0),new Vector3(.037f,.077f,.061f),a.Cream,.018f);a.Round(t,"Inward glove thumb",new Vector3(-side*.082f,-.008f,.018f),new Vector3(.07f,.095f,.075f),a.Cream,.034f).transform.localRotation=Quaternion.Euler(0,0,side*28);a.Round(t,"Chunky cuff",new Vector3(0,-.12f,0),new Vector3(.16f,.09f,.13f),a.Coral,.044f);a.Round(t,"Soft sleeve",new Vector3(0,-.30f,.012f),new Vector3(.15f,.32f,.14f),a.Teal,.069f);return t;}
+  Transform Hand(SoftArt a,int side){var t=a.Group(View.transform,side<0?"Left bubbly glove":"Right bubbly glove",Vector3.zero);t.gameObject.AddComponent<SoftGlove>().Build(a,side);return t;}
   void Update()
   {
    if(Input.GetKeyDown(KeyCode.Escape)){locked=!locked;Cursor.lockState=locked?CursorLockMode.Locked:CursorLockMode.None;Cursor.visible=!locked;}
@@ -30,7 +32,7 @@ namespace TheElevator.SoftOffice
   public void Grab(SoftPickup item){if(!item||Held)return;Held=item;charge=0;foreach(Collider c in item.GetComponentsInChildren<Collider>())Physics.IgnoreCollision(motor,c,true);}
   public void Release(float force){if(!Held)return;var item=Held;Held=null;foreach(Collider c in item.GetComponentsInChildren<Collider>())Physics.IgnoreCollision(motor,c,false);item.Body.linearVelocity=Vector3.ClampMagnitude(item.Body.linearVelocity,2)+View.transform.forward*Mathf.Clamp01(force)*7;item.Body.angularVelocity=View.transform.right*force*2;charge=0;}
   void FixedUpdate(){if(!Held)return;Rigidbody b=Held.Body;Vector3 goal=View.transform.TransformPoint(new Vector3(0,-.24f,1.05f));Vector3 acceleration=(goal-b.worldCenterOfMass)*55-b.linearVelocity*11;b.AddForce(Vector3.ClampMagnitude(acceleration,45),ForceMode.Acceleration);b.angularVelocity*=.9f;}
-  void LateUpdate(){if(!View)return;PoseHand(LeftHand,-1);PoseHand(RightHand,1);}
+  void LateUpdate(){if(!View)return;PoseHand(LeftHand,-1);PoseHand(RightHand,1);if(Body)Body.PlayerPose(velocity.magnitude);LeftHand.GetComponent<SoftGlove>().Pose(Held,velocity.magnitude/6);RightHand.GetComponent<SoftGlove>().Pose(Held,velocity.magnitude/6);}
   void PoseHand(Transform hand,int side)
   {
    float moving=Mathf.Clamp01(velocity.magnitude/5),t=Time.time*(velocity.magnitude>4?9:6)+side*1.5f;
@@ -43,4 +45,3 @@ namespace TheElevator.SoftOffice
   void OnDestroy(){Cursor.lockState=CursorLockMode.None;Cursor.visible=true;}
  }
 }
-

@@ -58,13 +58,13 @@ namespace TheElevator
             View.tag = "MainCamera";
             View.nearClipPlane = 0.08f;
             View.farClipPlane = 100;
-            View.fieldOfView = 68;
+            View.fieldOfView = 74;
             View.backgroundColor = Workshop.Ink;
             View.clearFlags = CameraClearFlags.SolidColor;
             View.gameObject.AddComponent<AudioListener>();
             flashlight = View.gameObject.AddComponent<Light>();
             flashlight.type = LightType.Spot; flashlight.range = 24; flashlight.spotAngle = 72;
-            flashlight.intensity = 3; flashlight.color = new Color(1,0.94f,0.80f); flashlight.shadows = LightShadows.Hard;
+            flashlight.intensity = .6f; flashlight.color = new Color(1,0.94f,0.80f); flashlight.shadows = LightShadows.Soft;
             Teleport(new Vector3(0, 0.08f, -6.5f));
         }
 
@@ -89,12 +89,12 @@ namespace TheElevator
             if(ReadingNotebook)return;
             damageCooldown -= Time.deltaTime;
             yaw += Input.GetAxisRaw("Mouse X") * 2.1f;
-            pitch = Mathf.Clamp(pitch - Input.GetAxisRaw("Mouse Y") * 1.8f, -35, 65);
+            pitch = Mathf.Clamp(pitch - Input.GetAxisRaw("Mouse Y") * 1.8f, -65, 75);
             if (Input.GetKeyDown(KeyCode.L)) flashlightOn = !flashlightOn;
             if (Input.GetKeyDown(KeyCode.V) && (Application.isEditor || Debug.isDebugBuild))
             {
                 firstPerson = !firstPerson;
-                Model.gameObject.SetActive(!firstPerson);
+                Model.SetView(firstPerson,Crouched);
             }
             float horizontal = (Input.GetKey(KeyCode.D) ? 1 : 0) - (Input.GetKey(KeyCode.A) ? 1 : 0);
             float forward = (Input.GetKey(KeyCode.W) ? 1 : 0) - (Input.GetKey(KeyCode.S) ? 1 : 0);
@@ -253,7 +253,7 @@ namespace TheElevator
             if (game.Phase == DescentGame.RunPhase.Briefing || game.Phase == DescentGame.RunPhase.Generating)
             {
                 if(Hands)Hands.gameObject.SetActive(false);
-                Model.gameObject.SetActive(true);
+                Model.SetView(false,false);
                 flashlight.enabled = false;
                 View.rect = new Rect(0.45f, 0, 0.55f, 1);
                 Model.Animate(0, false, Time.unscaledDeltaTime);
@@ -261,7 +261,7 @@ namespace TheElevator
                 View.transform.LookAt(transform.position + Vector3.up * 1.05f);
                 return;
             }
-            Model.gameObject.SetActive(!firstPerson);
+            Model.SetView(firstPerson,Crouched);
             flashlight.enabled = flashlightOn;
             View.rect = new Rect(0, 0, 1, 1);
             if (game.Paused) return;
@@ -282,11 +282,3 @@ namespace TheElevator
         }
     }
 }
-
-
-
-
-
-
-
-

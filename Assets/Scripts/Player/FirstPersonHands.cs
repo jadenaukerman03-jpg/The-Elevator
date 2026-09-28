@@ -7,13 +7,14 @@ namespace TheElevator
     {
         sealed class Hand
         {
-            public Transform Root,Palm,Wrist,Arm;
+            public Transform Root;
+            public TheElevator.SoftOffice.SoftGlove Glove;
             public readonly Mesh[] Fingers=new Mesh[5];
             public readonly Transform[] Nails=new Transform[5];
         }
         Hand left,right;
-        Material skin,nailMaterial;
-        Mesh palmMesh;
+        Material skin;
+
         WorkerController player;
         float transition,releaseMotion;
         SalvageItem previous;
@@ -21,26 +22,31 @@ namespace TheElevator
         public float MaxContactError { get; private set; }
         public void Initialize(WorkerController owner,OfficeArt art)
         {
-            player=owner;palmMesh=BuildPalm();skin=art.W.Own(new Material(Shader.Find("Elevator/ViewmodelSkin")){color=new Color(.72f,.54f,.40f)});nailMaterial=art.W.Own(new Material(skin){color=new Color(.76f,.65f,.55f)});left=Build(art,-1);right=Build(art,1);
+            player=owner;skin=art.W.Soft.Cream;left=Build(art,-1);right=Build(art,1);
         }
         Hand Build(OfficeArt art,int side)
         {
-            Hand hand=new Hand();hand.Root=art.Group(transform,side<0?"Left human hand":"Right human hand",Vector3.zero);
-            hand.Palm=art.Box(hand.Root,"Anatomical palm",Vector3.zero,new Vector3(.098f,.104f,.040f),skin).transform;hand.Palm.GetComponent<MeshFilter>().sharedMesh=palmMesh;
-            hand.Wrist=art.Round(hand.Root,"Wrist",new Vector3(0,-.068f,0),new Vector3(.056f,.065f,.033f),skin,PrimitiveType.Sphere).transform;
-            hand.Arm=art.Round(hand.Root,"Sleeved forearm",new Vector3(0,-.245f,0),new Vector3(.074f,.16f,.061f),art.Dark,PrimitiveType.Capsule).transform;
-            art.Round(hand.Root,"Shirt cuff",new Vector3(0,-.092f,0),new Vector3(.067f,.035f,.051f),art.Paper,PrimitiveType.Sphere);
-            for(int finger=0;finger<5;finger++)
+            var hand=new Hand();hand.Root=art.Group(transform,side<0?"Left bubbly hand":"Right bubbly hand",Vector3.zero);
+            hand.Glove=hand.Root.gameObject.AddComponent<TheElevator.SoftOffice.SoftGlove>();hand.Glove.Build(art.W.Soft,side);
+            for(int i=0;i<5;i++)
             {
-                GameObject digit=new GameObject("Smooth anatomical finger "+finger);digit.transform.SetParent(hand.Root,false);
-                Mesh mesh=new Mesh{name="Tapered finger surface"};mesh.MarkDynamic();hand.Fingers[finger]=mesh;
+                var digit=new GameObject("Contact finger "+i);digit.transform.SetParent(hand.Root,false);
+                var mesh=new Mesh{name="Rounded contact finger"};mesh.MarkDynamic();hand.Fingers[i]=mesh;
                 digit.AddComponent<MeshFilter>().sharedMesh=mesh;digit.AddComponent<MeshRenderer>().sharedMaterial=skin;
-                hand.Nails[finger]=art.Round(hand.Root,"Fingernail "+finger,Vector3.zero,new Vector3(.009f,.012f,.0015f),nailMaterial,PrimitiveType.Sphere).transform;
+                hand.Nails[i]=new GameObject("Contact tip "+i).transform;hand.Nails[i].SetParent(hand.Root,false);
             }
-            foreach(Renderer renderer in hand.Root.GetComponentsInChildren<Renderer>())renderer.shadowCastingMode=UnityEngine.Rendering.ShadowCastingMode.Off;
+            foreach(Renderer r in hand.Root.GetComponentsInChildren<Renderer>())r.shadowCastingMode=UnityEngine.Rendering.ShadowCastingMode.Off;
             return hand;
         }
-        public static string GripFor(SalvageItem item)
+        void SetGripVisuals(Hand hand,bool holding)
+        {
+            foreach(Transform child in hand.Root)
+            {
+                if(child.name.StartsWith("Finger ")||child.name=="Opposed inward thumb")child.gameObject.SetActive(!holding);
+                if(child.name.StartsWith("Contact finger"))child.gameObject.SetActive(holding);
+            }
+            hand.Glove.Pose(holding,player.MotionSpeed/6);
+        }        public static string GripFor(SalvageItem item)
         {
             if(item.IsBattery)return "BATTERY CRADLE";
             string name=item.Title.ToLowerInvariant();
@@ -54,7 +60,7 @@ namespace TheElevator
         {
             gameObject.SetActive(visible);if(!visible)return;
             if(held!=previous){if(previous&&!held)releaseMotion=1;transition=0;previous=held;}transition=Mathf.MoveTowards(transition,1,dt*5);releaseMotion=Mathf.MoveTowards(releaseMotion,0,dt*4);
-            MaxContactError=0;
+            MaxContactError=0;SetGripVisuals(left,held);SetGripVisuals(right,held);
             if(held)
             {
                 GripName=GripFor(held);BoxCollider shape=held.GetComponent<BoxCollider>();if(!shape)return;
@@ -74,15 +80,6 @@ namespace TheElevator
             hand.Root.position=player.View.transform.TransformPoint(new Vector3(side*.24f,-.28f+sway+releaseMotion*.07f,.48f+releaseMotion*.10f+Mathf.Cos(stride)*motion*.025f));
             hand.Root.rotation=player.View.transform.rotation*Quaternion.Euler(35+Mathf.Cos(stride)*motion*12,side*-12,side*-10);
             hand.Root.localScale=Vector3.one;
-            for(int finger=0;finger<5;finger++)
-            {
-                Vector3 start=finger==4?new Vector3(-side*.037f,-.013f,0):new Vector3(-.031f+finger*.021f,.04f,0);
-                Vector3 direction=finger==4?new Vector3(-side*.65f,.65f,.15f):new Vector3(0,1,.16f);
-                int anatomical=side<0?3-finger:finger;float length=finger==4?.052f:anatomical==3?.059f:anatomical==1?.086f:.075f;
-                Vector3[] points=new Vector3[4];points[0]=hand.Root.TransformPoint(start);
-                for(int j=1;j<4;j++){float t=j/3f;points[j]=hand.Root.TransformPoint(start+direction*length*t+Vector3.forward*t*t*.025f);}
-                Fingers(hand,finger,points,hand.Root.forward);
-            }
         }
         void PoseGrip(Hand hand,int side,SalvageItem item,BoxCollider box)
         {
@@ -98,7 +95,7 @@ namespace TheElevator
             hand.Root.localScale=Vector3.one;
             for(int finger=0;finger<5;finger++)
             {
-                float row=Mathf.Clamp(y+.035f-finger*.019f,-extent.y+.016f,extent.y-.016f);
+                float row=Mathf.Clamp(y+.035f-finger*.027f,-extent.y+.016f,extent.y-.016f);
                 Vector3[] p=new Vector3[4];
                 p[0]=center+new Vector3(side*(extent.x+.032f),row,-extent.z+.090f);
                 p[1]=center+new Vector3(side*(extent.x+.031f),row,-extent.z+.039f);
@@ -117,21 +114,7 @@ namespace TheElevator
                 MaxContactError=Mathf.Max(MaxContactError,Mathf.Abs(local.z+extent.z+.009f));
             }
         }
-        void OnDestroy(){if(palmMesh)Destroy(palmMesh);foreach(Hand hand in new[]{left,right})if(hand!=null)foreach(Mesh mesh in hand.Fingers)if(mesh)Destroy(mesh);}
-        static Mesh BuildPalm()
-        {
-            const int rings=24,sides=32;
-            var vertices=new Vector3[(rings+1)*(sides+1)];var triangles=new int[rings*sides*6];
-            for(int r=0;r<=rings;r++)for(int s=0;s<=sides;s++)
-            {
-                float angle=r*Mathf.PI/rings,around=s*Mathf.PI*2/sides;
-                float radius=Mathf.Pow(Mathf.Max(0,Mathf.Sin(angle)),.35f)*.5f;
-                float width=Mathf.Lerp(.69f,1f,(Mathf.Cos(angle)+1)*.5f);
-                vertices[r*(sides+1)+s]=new Vector3(Mathf.Cos(around)*radius*width,Mathf.Cos(angle)*.5f,Mathf.Sin(around)*radius);
-            }
-            int n=0;for(int r=0;r<rings;r++)for(int s=0;s<sides;s++){int a=r*(sides+1)+s,b=a+sides+1;triangles[n++]=a;triangles[n++]=a+1;triangles[n++]=b;triangles[n++]=b;triangles[n++]=a+1;triangles[n++]=b+1;}
-            var mesh=new Mesh{name="Rounded tapered palm"};mesh.vertices=vertices;mesh.triangles=triangles;mesh.RecalculateNormals();mesh.RecalculateBounds();return mesh;
-        }
+        void OnDestroy(){foreach(Hand hand in new[]{left,right})if(hand!=null)foreach(Mesh mesh in hand.Fingers)if(mesh)Destroy(mesh);}
         static void Fingers(Hand hand,int finger,Vector3[] points,Vector3 nailNormal)
         {
             const int rings=17,sides=12;
@@ -143,7 +126,7 @@ namespace TheElevator
                 Vector3 tangent=(3*u*u*(points[1]-points[0])+6*u*t*(points[2]-points[1])+3*t*t*(points[3]-points[2])).normalized;
                 Vector3 across=Vector3.Cross(tangent,nailNormal).normalized;if(across.sqrMagnitude<.1f)across=Vector3.Cross(tangent,Vector3.up).normalized;
                 Vector3 normal=Vector3.Cross(across,tangent).normalized;
-                float radius=(finger==4?.011f:.009f)*Mathf.Lerp(1,.76f,t)*Mathf.Sqrt(Mathf.Clamp01((1-t)*12));
+                float radius=(finger==4?.022f:.016f)*Mathf.Lerp(1,.76f,t)*Mathf.Sqrt(Mathf.Clamp01((1-t)*12));
                 if(r==0)radius*=.8f;
                 for(int k=0;k<sides;k++){float angle=k*Mathf.PI*2/sides;vertices[r*sides+k]=hand.Root.InverseTransformPoint(center+(across*Mathf.Cos(angle)+normal*Mathf.Sin(angle)*.86f)*radius);}
             }
@@ -154,10 +137,3 @@ namespace TheElevator
         }
     }
 }
-
-
-
-
-
-
-

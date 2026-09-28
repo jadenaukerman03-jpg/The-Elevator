@@ -9,7 +9,7 @@ namespace TheElevator.Editor
 {
     public static class ProjectTools
     {
-        const string ScenePath = "Assets/Scenes/Prototype.unity";
+        const string ScenePath = OfficeTools.ScenePath;
 
         [MenuItem("The Elevator/Open Prototype")]
         public static void OpenPrototype()

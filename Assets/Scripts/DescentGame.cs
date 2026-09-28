@@ -58,8 +58,8 @@ namespace TheElevator
             QualitySettings.shadowDistance = 45;
             QualitySettings.antiAliasing = 4;
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.42f, 0.49f, 0.50f);
-            RenderSettings.fog = true;
+            RenderSettings.ambientLight = new Color(.48f,.52f,.50f);
+            RenderSettings.fog = false;
             RenderSettings.fogColor = new Color(0.085f, 0.14f, 0.15f);
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogDensity = 0.018f;
@@ -70,8 +70,8 @@ namespace TheElevator
             Light fill = new GameObject("Facility fill").AddComponent<Light>();
             fill.transform.SetParent(transform);
             fill.type = LightType.Directional;
-            fill.color = new Color(0.70f, 0.81f, 0.85f);
-            fill.intensity = 0.7f;
+            fill.color = new Color(1,.92f,.80f);
+            fill.intensity = .55f;
             fill.shadows = LightShadows.Soft;
             fill.transform.rotation = Quaternion.Euler(55, -30, 0);
             builder.Cabin(transform);
@@ -435,9 +435,3 @@ namespace TheElevator
         }
     }
 }
-
-
-
-
-
-
