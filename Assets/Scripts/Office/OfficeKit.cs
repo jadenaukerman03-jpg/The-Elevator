@@ -62,7 +62,7 @@ namespace TheElevator.Office
                 {
                     A.Box(geometry,"Recessed luminaire",new Vector3(sign*3,height-.14f,0),new Vector3(1.24f,.1f,2.44f),A.Dark);
                     A.Box(geometry,"Opal light diffuser",new Vector3(sign*3,height-.2f,0),new Vector3(1.1f,.035f,2.3f),publicArea?A.WarmLight:A.CoolLight);
-                    A.W.Lamp(floor.RoomRoots[room.Id],new Vector3(sign*3,height-.45f,0),publicArea?new Color(1,.77f,.48f):service?new Color(.45f,.7f,.82f):new Color(.81f,.9f,.8f),publicArea?2.8f:2.1f,9);
+                    A.W.Lamp(floor.RoomRoots[room.Id],new Vector3(sign*3,height-.45f,0),publicArea?new Color(1,.95f,.86f):service?new Color(.78f,.88f,.95f):new Color(.93f,.97f,.95f),publicArea?1.7f:1.5f,9);
                     A.Box(geometry,"HVAC grille",new Vector3(sign*4,height-.13f,4),new Vector3(1.3f,.06f,.65f),A.Dark);
                     for(int slat=0;slat<12;slat++) A.Box(geometry,"Vent louver",new Vector3(sign*4-.56f+slat*.1f,height-.18f,4),new Vector3(.035f,.05f,.57f),A.Metal);
                 }

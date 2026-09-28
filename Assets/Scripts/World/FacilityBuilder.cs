@@ -46,7 +46,7 @@ namespace TheElevator
             for (int i = 0; i < 2; i++)
             {
                 Box("Ceiling lamp", root, -2.4f + i * 4.8f, 3.53f, -6, 0.22f, 0.05f, 3, Workshop.Cream);
-                w.Lamp(root, new Vector3(-2.3f + i * 4.6f, 2.9f, -6), new Color(1, 0.84f, 0.58f), 2.8f, 9);
+                w.Lamp(root, new Vector3(-2.3f + i * 4.6f, 2.9f, -6), new Color(1, 0.94f, 0.84f), 1.9f, 9);
             }
         }
 

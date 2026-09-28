@@ -162,7 +162,7 @@ namespace TheElevator
             new WardrobeItem("Flashlight and Radio", 65, r => { r.Add(r.Pelvis, "Chest flashlight", BeanRig.Capsule(.07f,.022f,.022f), new Vector3(-.12f,.30f,.18f), Vector3.one, new Color(.25f,.26f,.3f), Quaternion.Euler(-90, 0, 0));
                 r.Add(r.Pelvis, "Flashlight lens", BeanRig.Sphere(), new Vector3(-.12f,.30f,.27f), new Vector3(.042f,.042f,.02f), new Color(1f,.95f,.6f)); r.ShoulderRadio(); }),
             new WardrobeItem("Scarf", 45, Scarf),
-            new WardrobeItem("Work Gloves", 30, r => { r.Repaint("Mitten", GloveGrey); r.Repaint("Thumb", GloveGrey);
+            new WardrobeItem("Work Gloves", 30, r => { r.Repaint("Mitten", GloveGrey);
                 for (int side = -1; side <= 1; side += 2) r.Add(r.Hand(side), "Glove cuff", BeanRig.Torus(.052f,.016f), new Vector3(0,.005f,0), Vector3.one, Color.Lerp(GloveGrey, Color.white, .15f)); }),
         };
 

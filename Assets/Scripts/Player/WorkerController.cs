@@ -28,19 +28,16 @@ namespace TheElevator
         public FirstPersonHands Hands { get; private set; }
         public float ThrowCharge { get; private set; }
         public bool ChargingThrow { get; private set; }
-        public void InitializeHands(TheElevator.Office.OfficeArt art)
-        {
-            if(Hands)return;
-            Hands=new GameObject("First person hands").AddComponent<FirstPersonHands>();Hands.Initialize(this,art);
-        }
-        float eyeHeight=1.7f;
+        // Camera sits at the avatar's own eye line, the same height as every NPC's eyes.
+        public const float EyeHeight=1.34f, CrouchEyeHeight=.9f;
+        float eyeHeight=EyeHeight;
         DescentGame game;
         CharacterController motor;
         float yaw, pitch = 17f, vertical, damageCooldown, lastStep;
         bool firstPerson = true;
         ObjectiveTerminal terminal;
         Light flashlight;
-        bool flashlightOn = true;
+        bool flashlightOn = false;
         Vector3 knockback;
 
         public void Initialize(DescentGame owner, Workshop workshop)
@@ -55,11 +52,13 @@ namespace TheElevator
             Model = new GameObject("Employee 004").AddComponent<WorkerModel>();
             Model.transform.SetParent(transform, false);
             Model.Build(workshop, 0);
+            Hands = new GameObject("First person hands").AddComponent<FirstPersonHands>();
+            Hands.Initialize(this);
             View = new GameObject("Worker camera").AddComponent<Camera>();
             View.tag = "MainCamera";
             View.nearClipPlane = 0.08f;
             View.farClipPlane = 100;
-            View.fieldOfView = 74;
+            View.fieldOfView = 60;
             View.backgroundColor = Workshop.Ink;
             View.clearFlags = CameraClearFlags.SolidColor;
             View.gameObject.AddComponent<AudioListener>();
@@ -278,8 +277,8 @@ namespace TheElevator
             View.rect = new Rect(0, 0, 1, 1);
             if (game.Paused) return;
             Quaternion rotation = Quaternion.Euler(pitch, yaw, 0);
-            eyeHeight=Mathf.MoveTowards(eyeHeight,Crouched?.95f:1.7f,Time.deltaTime*4);
-            Vector3 pivot = transform.position + Vector3.up * (firstPerson ? eyeHeight : Crouched?.85f:1.45f);
+            eyeHeight=Mathf.MoveTowards(eyeHeight,Crouched?CrouchEyeHeight:EyeHeight,Time.deltaTime*4);
+            Vector3 pivot = transform.position + Vector3.up * (firstPerson ? eyeHeight : Crouched?.75f:1.2f);
             Vector3 position = pivot;
             if (!firstPerson)
             {

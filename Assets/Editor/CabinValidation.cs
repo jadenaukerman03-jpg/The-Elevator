@@ -35,7 +35,7 @@ namespace TheElevator.Editor
      var bodyRenderers=game.Player.Model.GetComponentsInChildren<Renderer>();
      Check(bodyRenderers.Count(r=>r.shadowCastingMode==UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly)>5,"Head and arms retain complete first-person shadow");
      Check(bodyRenderers.Count(r=>r.shadowCastingMode==UnityEngine.Rendering.ShadowCastingMode.On)>5,"Torso and legs remain visible");
-     Check(game.Player.Hands.GetComponentsInChildren<Transform>().Count(t=>t.name=="Mitten paddle")==2,"Original game uses bean-style mitten hands");
+     Check(game.Player.Hands.GetComponentsInChildren<Transform>().Count(t=>t.name=="First-person mitten")==2,"First person uses the one-piece bean mittens");
 
      game.Player.Hands.gameObject.SetActive(false);OfficeTools.Capture(game.transform,"TestResults/Office/cabin-redesign.png",new Vector3(-2.4f,1.8f,-8.7f),new Vector3(2.6f,1.65f,-3.2f));
      foreach(MeshFilter model in game.Player.Hands.GetComponentsInChildren<MeshFilter>(true))foreach(Vector3 v in model.sharedMesh.vertices)Check(!float.IsNaN(v.x)&&!float.IsNaN(v.y)&&!float.IsNaN(v.z),"Finite hand geometry");

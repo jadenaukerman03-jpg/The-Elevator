@@ -51,8 +51,8 @@ namespace TheElevator.Office
                 SetupSound();
                 officeLights=GetComponentsInChildren<Light>(true);
                 // Appearance switches only for the office theme; Civic Works keeps its worker model.
-                Game.Player.Model.UseOfficeRig(Kit.A);Game.Player.InitializeHands(Kit.A);
-                RenderSettings.ambientLight=new Color(.16f,.19f,.18f);
+                // Bright, even office light: the building reads clearly without relying on the flashlight.
+                RenderSettings.ambientLight=new Color(.40f,.42f,.43f);
                 RenderSettings.fogDensity=.008f;
             }
             Physics.SyncTransforms();

@@ -54,8 +54,10 @@ namespace TheElevator
         readonly List<Vector3> blinkScales = new List<Vector3>();
         readonly List<GameObject> shines = new List<GameObject>();
         GameObject mouthClosed, mouthOpen;
+        MeshFilter mittenL, mittenR;
+        Vector3 handPose = RelaxedHand;
         int identity;
-        float phase, seat;
+        float phase, seat, pace;
         Quaternion gaze = Quaternion.identity;
         Vector2 bob, bobVelocity;
         Vector3 lastPosition, lastVelocity;
@@ -153,9 +155,10 @@ namespace TheElevator
             elbow = Group("Elbow", shoulder, new Vector3(0, -UpperArm, 0));
             Part("Forearm", elbow, Capsule(Forearm,.054f,.05f), Vector3.zero, Vector3.one, forearm);
             Transform wrist = Group("Hand", elbow, new Vector3(0, -Forearm, 0));
-            Part("Mitten", wrist, Sphere(), new Vector3(0,-.05f,.005f), new Vector3(.13f,.15f,.10f), hand);
-            Part("Thumb", wrist, Capsule(.05f,.026f,.022f), new Vector3(-side * .03f,-.03f,.035f), Vector3.one, hand)
-                .transform.localRotation = Quaternion.Euler(-55, 0, -side * 25);
+            // Mitten space is fingers +Y, palm +Z: turn it to hang with the palm toward the body, thumb forward.
+            Renderer mitten = Part("Mitten", wrist, Mitten(RelaxedHand, side), new Vector3(0,-.07f,0), Vector3.one, hand,
+                Quaternion.LookRotation(new Vector3(-side, 0, 0), Vector3.down));
+            if (side < 0) mittenL = mitten.GetComponent<MeshFilter>(); else mittenR = mitten.GetComponent<MeshFilter>();
             return wrist;
         }
 
@@ -285,52 +288,144 @@ namespace TheElevator
         {
             if (!pelvis) return;
             float clock = Application.isPlaying ? Time.time : 0;
-            float walk = Mathf.Clamp01(pose.Speed / 1.4f);
-            phase += dt * (2.4f + pose.Speed * 2.3f);
-            float swing = Mathf.Sin(phase) * walk, breathe = Mathf.Sin(clock * 1.7f + identity);
+            // Smoothed ground speed; cadence follows stride length so fast running lengthens strides instead of flailing.
+            pace = Mathf.MoveTowards(pace, pose.Speed, dt * 12);
+            float walk = Mathf.Clamp01(pace / 1.2f), run = Mathf.SmoothStep(0, 1, Mathf.InverseLerp(2.4f, 4.8f, pace)), idle = 1 - walk;
+            float cycles = pace < .05f ? 0 : Mathf.Clamp(pace / (.9f + pace * .18f), .6f, 2.4f);
+            phase = (phase + dt * cycles * Mathf.PI * 2) % (Mathf.PI * 200);
+            float s = Mathf.Sin(phase), c = Mathf.Cos(phase), breathe = Mathf.Sin(clock * 1.7f + identity);
+            float shift = Mathf.Sin(clock * .55f + identity * 1.3f) * idle * (1 - seat);
             seat = Mathf.MoveTowards(seat, pose.Seated ? 1 : 0, dt * 2.6f);
 
-            float bounce = Mathf.Abs(Mathf.Cos(phase)) * walk * .03f;
-            pelvis.localPosition = new Vector3(0, Mathf.Lerp(HipHeight + bounce, SeatedHip, seat) + breathe * .004f, 0);
-            pelvis.localRotation = Quaternion.Euler(walk * 6 * (1 - seat) + (pose.Carrying ? 4 : 0), swing * 7, swing * 4);
-            PoseLeg(hipL, kneeL, ankleL, swing);
-            PoseLeg(hipR, kneeR, ankleR, -swing);
+            float bounce = walk * Mathf.Abs(c) * Mathf.Lerp(.018f, .045f, run);
+            float lean = walk * Mathf.Lerp(4, 15, run) * (1 - seat) + (pose.Carrying ? 4 : 0);
+            float twist = s * walk * Mathf.Lerp(5, 9, run);
+            pelvis.localPosition = new Vector3(shift * .012f, Mathf.Lerp(HipHeight - run * .03f + bounce, SeatedHip, seat) + breathe * .004f, 0);
+            pelvis.localRotation = Quaternion.Euler(lean, twist, s * walk * 3 + shift * 1.6f);
+            PoseLeg(hipL, kneeL, ankleL, s, c, walk, run, Mathf.Max(0, shift));
+            PoseLeg(hipR, kneeR, ankleR, -s, -c, walk, run, Mathf.Max(0, -shift));
 
-            bool talking = pose.Talking && !pose.Reaching && pose.Speed < .15f;
-            float follow = 1 - Mathf.Exp(-9 * dt), drag = 1 - Mathf.Exp(-6 * dt);
+            bool talking = pose.Talking && !pose.Reaching && pace < .15f;
+            float follow = 1 - Mathf.Exp(-(10 + walk * 10) * dt), drag = 1 - Mathf.Exp(-(7 + walk * 8) * dt);
             for (int side = -1; side <= 1; side += 2)
             {
                 Transform shoulder = side < 0 ? shoulderL : shoulderR, elbow = side < 0 ? elbowL : elbowR;
+                float armSwing = side * s * walk; // arms oppose the same-side leg
+                float sway = Mathf.Sin(clock * .9f + side * 1.7f + identity) * idle;
                 Quaternion arm = pose.Carrying ? Quaternion.Euler(-78, 0, side * 3)
-                    : Quaternion.Euler(pose.ArmPitch + side * swing * 30, 0, side * (7 + walk * 5));
-                float bend = pose.Carrying ? -35 : pose.ElbowBend - walk * 14;
+                    : Quaternion.Euler(pose.ArmPitch + armSwing * Mathf.Lerp(22, 50, run) + sway * 2, 0, side * (Mathf.Lerp(6, 12, run * walk) + sway * 1.5f));
+                // Walking arms hang loose; running arms pump bent at the elbow, bending further on the forward swing.
+                float bend = pose.Carrying ? -35 : pose.ElbowBend + Mathf.Lerp(-6, -78, run) * walk - Mathf.Max(0, -armSwing) * Mathf.Lerp(10, 18, run) + sway * 3;
                 if (pose.Typing) bend += Mathf.Sin(clock * 14 + side) * 3;
                 if (talking && side > 0) { arm = Quaternion.Euler(-25, 0, 12); bend = -70 + Mathf.Sin(clock * 4) * 14; }
                 shoulder.localRotation = Quaternion.Slerp(shoulder.localRotation, arm, follow);
                 elbow.localRotation = Quaternion.Slerp(elbow.localRotation, Quaternion.Euler(bend, 0, 0), drag);
             }
             if (pose.Reaching) Reach(pose.ReachTarget);
+            SetHands(pose.Carrying || pose.Reaching ? GripHand : pose.Typing ? new Vector3(8, 10, 5) : RelaxedHand);
 
             Vector3 toward = pose.LookTarget == Vector3.zero ? Vector3.forward : Quaternion.Inverse(transform.rotation) * (pose.LookTarget - head.position);
             float yaw = Mathf.Clamp(Mathf.Atan2(toward.x, toward.z) * Mathf.Rad2Deg, -60, 60);
             float tilt = pose.LookTarget == Vector3.zero ? 0 : Mathf.Clamp(-Mathf.Atan2(toward.y, new Vector2(toward.x, toward.z).magnitude) * Mathf.Rad2Deg, -25, 30);
+            if (pose.LookTarget == Vector3.zero) { yaw += Mathf.Sin(clock * .23f + identity) * 9 * idle; tilt += Mathf.Sin(clock * .31f + identity * .7f) * 3 * idle; }
             if (pose.Typing) tilt = 14;
             gaze = Quaternion.Slerp(gaze, Quaternion.Euler(tilt, yaw, 0), 1 - Mathf.Exp(-3.5f * dt));
             Bobble(dt);
-            head.localRotation = gaze * Quaternion.Euler(bob.x + Mathf.Sin(phase * 2) * walk * 2.5f, 0, bob.y + breathe * .6f);
+            // The head steadies against the hips' twist so the face stays pointed where the body is going.
+            head.localRotation = Quaternion.Euler(-lean * .5f, -twist * .8f, 0) * gaze * Quaternion.Euler(bob.x + Mathf.Sin(phase * 2) * walk * 1.5f, 0, bob.y + breathe * .6f);
 
             float blink = (clock + identity * .71f) % 4.3f < .11f ? .12f : 1;
-            for (int i = 0; i < blinkers.Count; i++) { Vector3 s = blinkScales[i]; blinkers[i].localScale = new Vector3(s.x, s.y * blink, s.z); }
+            for (int i = 0; i < blinkers.Count; i++) { Vector3 scale = blinkScales[i]; blinkers[i].localScale = new Vector3(scale.x, scale.y * blink, scale.z); }
             foreach (GameObject shine in shines) shine.SetActive(blink == 1);
             bool open = talking && Mathf.Sin(clock * 17 + identity) > 0;
             mouthClosed.SetActive(!open); mouthOpen.SetActive(open);
         }
 
-        void PoseLeg(Transform hip, Transform knee, Transform ankle, float swing)
+        // swing: +1 leg back, -1 leg forward. The knee folds while the leg travels forward; the toe rolls off behind.
+        void PoseLeg(Transform hip, Transform knee, Transform ankle, float swing, float travel, float walk, float run, float rest)
         {
-            hip.localRotation = Quaternion.Euler(Mathf.Lerp(swing * 34, -86, seat), 0, 0);
-            knee.localRotation = Quaternion.Euler(Mathf.Lerp(Mathf.Max(0, -swing) * 48, 86, seat), 0, 0);
-            ankle.rotation = Quaternion.Euler(0, transform.eulerAngles.y, 0);
+            float thigh = swing * walk * Mathf.Lerp(26, 48, run);
+            float fold = walk * (Mathf.Max(0, -travel) * Mathf.Lerp(35, 95, run) + Mathf.Lerp(4, 12, run)) + rest * 6;
+            hip.localRotation = Quaternion.Euler(Mathf.Lerp(thigh - fold * .25f, -86, seat), 0, 0);
+            knee.localRotation = Quaternion.Euler(Mathf.Lerp(fold, 86, seat), 0, 0);
+            float toe = Mathf.Max(0, swing) * walk * Mathf.Lerp(10, 25, run) * (1 - seat);
+            ankle.rotation = Quaternion.Euler(0, transform.eulerAngles.y, 0) * Quaternion.Euler(toe, 0, 0);
+        }
+
+        // ---- One-piece mitten: knuckle, finger and thumb bends of a single continuous surface ----------
+
+        public static readonly Vector3 RelaxedHand = new Vector3(12, 18, 10), GripHand = new Vector3(20, 85, 40);
+
+        void SetHands(Vector3 bend)
+        {
+            if (bend == handPose || !mittenL) return;
+            handPose = bend;
+            mittenL.sharedMesh = Mitten(bend, -1);
+            mittenR.sharedMesh = Mitten(bend, 1);
+        }
+
+        public static Mesh Mitten(Vector3 bend, int side)
+        {
+            string key = "Mitten " + bend + "/" + side;
+            if (meshes.TryGetValue(key, out Mesh cached) && cached) return cached;
+            Mesh mesh = new Mesh { name = key, hideFlags = HideFlags.DontSave };
+            Mitten(mesh, bend, side);
+            meshes[key] = mesh;
+            return mesh;
+        }
+
+        // Mitten space: palm centre at the origin, wrist at -Y, fingers toward +Y, palm facing +Z, thumb on the -side X edge.
+        // bend = (knuckle, finger middle, thumb) curl in degrees toward the palm.
+        public static void Mitten(Mesh mesh, Vector3 bend, int side)
+        {
+            const int rings = 18, segments = 24;
+            Vector3 thumbBase = new Vector3(-side * .045f, -.03f, .01f), thumbOut = new Vector3(-side, .5f, .35f).normalized;
+            Vector3 knuckle = new Vector3(0, .02f, .042f), middle = new Vector3(0, .055f, .042f), thumbPivot = new Vector3(-side * .035f, -.045f, .02f);
+            Quaternion knuckleTurn = Quaternion.Euler(bend.x, 0, 0), middleTurn = Quaternion.Euler(bend.y, 0, 0);
+            var vertices = new Vector3[(rings - 1) * segments + 2];
+            vertices[0] = Deform(new Vector3(0, .09f, 0));
+            vertices[vertices.Length - 1] = Deform(new Vector3(0, -.075f, 0));
+            for (int r = 1; r < rings; r++)
+                for (int s = 0; s < segments; s++)
+                {
+                    float lat = Mathf.PI * r / rings, lon = Mathf.PI * 2 * s / segments;
+                    // Squarer than an ellipse across the palm, rounder along the thickness.
+                    float x = Mathf.Sign(Mathf.Cos(lon)) * Mathf.Pow(Mathf.Abs(Mathf.Cos(lon)), .75f), z = Mathf.Sin(lon);
+                    float y = Mathf.Cos(lat), ring = Mathf.Pow(Mathf.Sin(lat), .8f);
+                    vertices[1 + (r - 1) * segments + s] = Deform(new Vector3(x * ring * .06f, y > 0 ? y * .085f + .005f : y * .08f + .005f, z * ring * .042f));
+                }
+            var triangles = new List<int>();
+            for (int s = 0; s < segments; s++)
+            {
+                int next = (s + 1) % segments;
+                triangles.Add(0); triangles.Add(1 + next); triangles.Add(1 + s);
+                for (int r = 1; r < rings - 1; r++)
+                {
+                    int a = 1 + (r - 1) * segments + s, b = 1 + (r - 1) * segments + next, cc = a + segments, d = b + segments;
+                    triangles.Add(a); triangles.Add(b); triangles.Add(cc);
+                    triangles.Add(b); triangles.Add(d); triangles.Add(cc);
+                }
+                int last = 1 + (rings - 2) * segments;
+                triangles.Add(last + s); triangles.Add(last + next); triangles.Add(vertices.Length - 1);
+            }
+            mesh.Clear();
+            mesh.vertices = vertices; mesh.SetTriangles(triangles, 0);
+            mesh.RecalculateNormals(); mesh.RecalculateBounds();
+
+            Vector3 Deform(Vector3 p)
+            {
+                // Thumb: a smooth lobe grown out of the palm edge, then swung toward the palm about its root.
+                float thumb = Mathf.Exp(-(p - thumbBase).sqrMagnitude / (.028f * .028f));
+                p += thumbOut * .04f * thumb;
+                if (thumb > .05f) p = thumbPivot + Quaternion.Euler(0, side * bend.z * thumb, 0) * (p - thumbPivot);
+                // Fingers: two soft hinges across the width; the finger block is everything past the knuckle line.
+                float finger = (1 - thumb) * Mathf.SmoothStep(0, 1, Mathf.InverseLerp(.005f, .035f, p.y));
+                float tip = (1 - thumb) * Mathf.SmoothStep(0, 1, Mathf.InverseLerp(.045f, .07f, p.y));
+                Vector3 original = p;
+                p = middle + Quaternion.Slerp(Quaternion.identity, middleTurn, tip) * (p - middle);
+                p = knuckle + Quaternion.Slerp(Quaternion.identity, knuckleTurn, finger) * (p - knuckle);
+                return finger > 0 || tip > 0 ? p : original;
+            }
         }
 
         // Head lags behind body acceleration on an underdamped spring: the wobbly bobblehead feel.

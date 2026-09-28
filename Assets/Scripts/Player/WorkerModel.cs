@@ -13,8 +13,6 @@ namespace TheElevator
         public Color HandColor { get { return rig.ColorOf("Mitten"); } }
         public Color SleeveColor { get { return rig.ColorOf("Forearm"); } }
 
-        public void UseOfficeRig(TheElevator.Office.OfficeArt art) { }
-
         public void Build(Workshop w, int colorIndex) { Apply(AvatarLoadout.Load()); }
 
         // Rebuilds the plain avatar and layers the loadout's cosmetics on top.

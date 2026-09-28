@@ -65,7 +65,7 @@ namespace TheElevator.Office
         public bool Sees(Vector3 position)
         {
             bool crouched=Office.Game&&Office.Game.Player.Crouched&&(position-Office.Game.Player.transform.position).sqrMagnitude<2;
-            Vector3 eye=transform.position+Vector3.up*(Robot&&Robot.Seated?1.26f:1.64f);
+            Vector3 eye=transform.position+Vector3.up*(Robot&&Robot.Seated?WorkerController.EyeHeight-.04f:WorkerController.EyeHeight);
             Vector3 target=position+Vector3.up*(crouched?.64f:1.15f),delta=target-eye;
             if(delta.magnitude>(crouched?8:11)||Vector3.Angle(transform.forward,delta)>72)return false;
             return !Physics.Raycast(eye+transform.forward*.14f,(target-eye-transform.forward*.14f).normalized,Mathf.Max(0,delta.magnitude-.4f),~((1<<2)|(1<<8)),QueryTriggerInteraction.Ignore);
@@ -73,7 +73,7 @@ namespace TheElevator.Office
         public void React(float amount,string reason)
         {
             Suspicion=Mathf.Clamp(Suspicion+amount,0,100);attentionUntil=Time.time+7;
-            if(Office.Game){LastObservedPosition=Office.Game.Player.transform.position;Robot.LookTarget=LastObservedPosition+Vector3.up*(Office.Game.Player.Crouched?.8f:1.6f);Office.Questioner=this;Office.Game.Notify(Job+": "+reason);}
+            if(Office.Game){LastObservedPosition=Office.Game.Player.transform.position;Robot.LookTarget=LastObservedPosition+Vector3.up*(Office.Game.Player.Crouched?WorkerController.CrouchEyeHeight:WorkerController.EyeHeight);Office.Questioner=this;Office.Game.Notify(Job+": "+reason);}
         }
         void Update()
         {
@@ -121,7 +121,7 @@ namespace TheElevator.Office
                 else if(Station.EquipmentMissing){State="Workstation missing";Robot.Activity=OfficeTask.Reading;}
                 else State=Station.Activity==OfficeTask.Meeting?"Discussing quarterly targets":"Working";
             }
-            if(Time.time<attentionUntil)Robot.LookTarget=Office.Game.Player.transform.position+Vector3.up*(Office.Game.Player.Crouched?.8f:1.6f);
+            if(Time.time<attentionUntil)Robot.LookTarget=Office.Game.Player.transform.position+Vector3.up*(Office.Game.Player.Crouched?WorkerController.CrouchEyeHeight:WorkerController.EyeHeight);
             else if(Station&&Station.Activity==OfficeTask.Meeting)
             {
                 OfficeEmployee colleague=Office.Employees.Find(e=>e!=this&&e.Station&&e.Station.RoomId==Station.RoomId&&!e.Travelling);

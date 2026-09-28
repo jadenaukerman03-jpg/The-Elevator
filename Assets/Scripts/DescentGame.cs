@@ -57,6 +57,10 @@ namespace TheElevator
             QualitySettings.shadows = ShadowQuality.All;
             QualitySettings.shadowDistance = 45;
             QualitySettings.antiAliasing = 4;
+            QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable;
+            // Builds render at the monitor's native resolution; a remembered small window would be upscaled and blurry.
+            if (!Application.isEditor && !Application.isBatchMode && (Screen.width < Screen.currentResolution.width || Screen.height < Screen.currentResolution.height))
+                Screen.SetResolution(Screen.currentResolution.width, Screen.currentResolution.height, FullScreenMode.FullScreenWindow);
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(.48f,.52f,.50f);
             RenderSettings.fog = false;
