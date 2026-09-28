@@ -6,8 +6,8 @@ namespace TheElevator.SoftOffice
  {
   public readonly List<Object> Owned=new List<Object>();
   readonly Dictionary<string,Mesh> meshes=new Dictionary<string,Mesh>();
-  public readonly Material Cream,Teal,Coral,Gold,Ink,Floor,Leaf,Screen;
-  public SoftArt(){Cream=Mat("Porcelain",new Color(.94f,.88f,.73f));Teal=Mat("Lagoon",new Color(.16f,.53f,.53f));Coral=Mat("Persimmon",new Color(.9f,.37f,.27f));Gold=Mat("Clearance gold",new Color(.98f,.69f,.22f));Ink=Mat("Ink blue",new Color(.13f,.23f,.3f));Floor=Mat("Warm stone",new Color(.69f,.76f,.71f));Leaf=Mat("Rubber foliage",new Color(.31f,.61f,.42f));Screen=Mat("Quiet screen",new Color(.11f,.30f,.35f));}
+  public readonly Material Cream,Teal,Coral,Gold,Ink,Floor,Leaf,Screen,Plum;
+  public SoftArt(){Plum=Mat("Inkberry",new Color(.43f,.34f,.56f));Cream=Mat("Porcelain",new Color(.94f,.88f,.73f));Teal=Mat("Lagoon",new Color(.16f,.53f,.53f));Coral=Mat("Persimmon",new Color(.9f,.37f,.27f));Gold=Mat("Clearance gold",new Color(.98f,.69f,.22f));Ink=Mat("Ink blue",new Color(.13f,.23f,.3f));Floor=Mat("Warm stone",new Color(.69f,.76f,.71f));Leaf=Mat("Rubber foliage",new Color(.31f,.61f,.42f));Screen=Mat("Quiet screen",new Color(.11f,.30f,.35f));}
   Material Mat(string name,Color color){var m=new Material(Shader.Find("Standard")){name=name,color=color};m.SetFloat("_Glossiness",.16f);Owned.Add(m);return m;}
   public Transform Group(Transform parent,string name,Vector3 p){var t=new GameObject(name).transform;t.SetParent(parent,false);t.localPosition=p;return t;}
   public GameObject Round(Transform parent,string name,Vector3 p,Vector3 size,Material mat,float radius=.15f,bool solid=false)
@@ -20,6 +20,13 @@ namespace TheElevator.SoftOffice
   {var go=GameObject.CreatePrimitive(PrimitiveType.Sphere);go.name=name;go.transform.SetParent(parent,false);go.transform.localPosition=p;go.transform.localScale=size;go.GetComponent<Collider>().enabled=false;go.GetComponent<Renderer>().sharedMaterial=mat;return go;}
   public TextMesh Print(Transform parent,string text,Vector3 p,float size,Material ink)
   {var t=Group(parent,"Printed / "+text,p);var tm=t.gameObject.AddComponent<TextMesh>();tm.font=Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");tm.fontSize=64;tm.characterSize=size;tm.anchor=TextAnchor.MiddleCenter;tm.alignment=TextAlignment.Center;tm.text=text;tm.color=ink.color;var m=new Material(Shader.Find("Elevator/WorldLabel"));m.mainTexture=tm.font.material.mainTexture;Owned.Add(m);tm.GetComponent<Renderer>().sharedMaterial=m;return tm;}
+  public GameObject Ring(Transform parent,string name,Vector3 position,float radius,float thickness,Material mat)
+  {
+   const int major=48,minor=12;var vertices=new Vector3[(major+1)*(minor+1)];var triangles=new int[major*minor*6];int index=0;
+   for(int i=0;i<=major;i++)for(int j=0;j<=minor;j++){float u=i*Mathf.PI*2/major,v=j*Mathf.PI*2/minor;vertices[i*(minor+1)+j]=new Vector3(Mathf.Cos(u)*(radius+Mathf.Cos(v)*thickness),Mathf.Sin(u)*(radius+Mathf.Cos(v)*thickness),Mathf.Sin(v)*thickness);}
+   for(int i=0;i<major;i++)for(int j=0;j<minor;j++){int k=i*(minor+1)+j,n=k+minor+1;triangles[index++]=k;triangles[index++]=n;triangles[index++]=k+1;triangles[index++]=n;triangles[index++]=n+1;triangles[index++]=k+1;}
+   Mesh mesh=new Mesh{name=name};mesh.vertices=vertices;mesh.triangles=triangles;mesh.RecalculateNormals();mesh.RecalculateBounds();Owned.Add(mesh);var root=Group(parent,name,position).gameObject;root.AddComponent<MeshFilter>().sharedMesh=mesh;root.AddComponent<MeshRenderer>().sharedMaterial=mat;return root;
+  }
   public static Mesh Rounded(Vector3 size,float radius)
   {
    Vector3 half=size*.5f;Vector3 bevel=new Vector3(Mathf.Min(radius,half.x*.98f),Mathf.Min(radius,half.y*.98f),Mathf.Min(radius,half.z*.98f));Vector3 core=half-bevel;
@@ -39,4 +46,3 @@ namespace TheElevator.SoftOffice
   public void Dispose(){foreach(Object o in Owned)if(o){if(Application.isPlaying)Object.Destroy(o);else Object.DestroyImmediate(o);}Owned.Clear();}
  }
 }
-

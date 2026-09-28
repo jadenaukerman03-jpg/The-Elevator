@@ -6,7 +6,9 @@ namespace TheElevator
     // Shared primitive construction keeps the prototype editable without imported assets.
     public sealed class Workshop
     {
+        public readonly TheElevator.SoftOffice.SoftArt Soft = new TheElevator.SoftOffice.SoftArt();
         readonly Dictionary<Color, Material> materials = new Dictionary<Color, Material>();
+        readonly Dictionary<Vector3,Mesh> softBoxes=new Dictionary<Vector3,Mesh>();
         Material labelMaterial;
         Font labelFont;
         readonly List<Material> ownedMaterials = new List<Material>();
@@ -21,7 +23,7 @@ namespace TheElevator
         public Material Mat(Color color)
         {
             if (materials.TryGetValue(color, out Material mat)) return mat;
-            Shader shader = Shader.Find("Elevator/PrototypeSurface");
+            Shader shader = Shader.Find("Standard");
             if (!shader) shader = Shader.Find("Standard");
             mat = new Material(shader) { color = color, name = "Workshop " + color };
             materials.Add(color, mat);
@@ -36,6 +38,16 @@ namespace TheElevator
             go.transform.SetParent(parent, false);
             go.transform.localPosition = position;
             go.transform.localScale = scale;
+                        if(type==PrimitiveType.Cube)
+            {
+                if(!softBoxes.TryGetValue(scale,out Mesh mesh))
+                {
+                    mesh=TheElevator.SoftOffice.SoftArt.Rounded(scale,.12f);var vertices=mesh.vertices;
+                    for(int i=0;i<vertices.Length;i++)vertices[i]=new Vector3(vertices[i].x/Mathf.Max(.0001f,scale.x),vertices[i].y/Mathf.Max(.0001f,scale.y),vertices[i].z/Mathf.Max(.0001f,scale.z));
+                    mesh.vertices=vertices;mesh.RecalculateNormals();mesh.RecalculateBounds();softBoxes.Add(scale,mesh);Soft.Owned.Add(mesh);
+                }
+                go.GetComponent<MeshFilter>().sharedMesh=mesh;
+            }
             go.GetComponent<Renderer>().sharedMaterial = Mat(color);
             if (!solid)
             {
@@ -102,6 +114,7 @@ namespace TheElevator
 
         public void Dispose()
         {
+            Soft.Dispose();
             Font.textureRebuilt -= RefreshFontAtlas;
             if (labelMaterial) { if (Application.isPlaying) Object.Destroy(labelMaterial); else Object.DestroyImmediate(labelMaterial); }
             foreach (Material mat in materials.Values) { if (Application.isPlaying) Object.Destroy(mat); else Object.DestroyImmediate(mat); }
@@ -111,4 +124,3 @@ namespace TheElevator
         }
     }
 }
-

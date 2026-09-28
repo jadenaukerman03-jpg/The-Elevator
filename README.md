@@ -9,11 +9,25 @@ A standalone Unity 3D prototype about disposable maintenance workers exploring a
 ## Open and play
 
 1. In Unity Hub, open this **TheElevator** folder, containing Assets, Packages and ProjectSettings. Use Unity **6000.3.25f1** and the built-in rendering pipeline.
-2. Choose **The Elevator > Open Prototype**, then press **Play**.
+2. Choose **The Elevator > Play Updated Office** to start the original game.
 3. Wait for generation, choose a uniform, and click **Clock In**.
 4. On the first floor, pick up the reception access card, open the secured room, and haul the required asset fully into the lift before selecting the newly unlocked number.
 
 The world is assembled when Play starts. For an edit-mode map, open **The Elevator > Generation Lab**, choose a preset, click **Generate graph**, then **Build 3D preview**. The preview lives in a separate temporary scene and clears before Play.
+
+## Current redesign
+
+The original game now uses rounded office geometry, a soft color palette, full player-body rendering and shadows, and big-headed "bean" characters: painted faces, noodle arms, mitten hands. Existing office tasks, suspicion, keycards, cargo extraction and elevator progression are preserved. See [art-direction notes](Docs/ArtDirection/README.md).
+
+The uniform picker chooses one of four crew looks (hard hat, beanie, ball cap, goggles), one per future co-op player:
+
+![Four crew looks](Docs/ArtDirection/crew.png)
+
+Office staff dress for their job: associate, receptionist (headset), technician (tool belt), records clerk (cardigan, glasses), security (cap, radio) and supervisor (red tie). Re-render both lineups with **The Elevator > Render Character Cast**.
+
+![Office staff by job](Docs/ArtDirection/staff.png)
+
+To create the Windows game after cloning, open the project in Unity and choose **The Elevator > Build Windows Player**. Run `PLAY THE ELEVATOR.cmd` after the build completes. The executable is generated at `Builds/Windows/TheElevator.exe`. Build output, Unity caches and temporary validation results are intentionally excluded from Git; the source assets, scenes, packages, project settings, tests and tools needed to rebuild are included.
 
 ## Map sizes
 

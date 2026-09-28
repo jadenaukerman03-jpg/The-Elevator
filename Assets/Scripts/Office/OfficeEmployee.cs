@@ -44,7 +44,8 @@ namespace TheElevator.Office
             motor=gameObject.AddComponent<CharacterController>();motor.height=1.82f;motor.radius=.27f;motor.center=Vector3.up*.91f;motor.stepOffset=.28f;motor.skinWidth=.025f;
             foreach(OfficeEmployee other in office.Employees)if(other.Motor)Physics.IgnoreCollision(motor,other.Motor);
             Transform visual=office.Kit.A.Group(transform,"Synthetic employee",Vector3.zero);
-            Robot=visual.gameObject.AddComponent<BusinessRobot>();Robot.Build(office.Kit.A,id,supervisor||IsSecurity);Robot.Activity=station.Activity;Robot.Seated=station.Seated;
+            BeanOutfit outfit=IsSecurity?BeanOutfit.Security:supervisor?BeanOutfit.Office:station.Activity==OfficeTask.Reception?BeanOutfit.Reception:station.Activity==OfficeTask.Repair?BeanOutfit.Technician:station.Activity==OfficeTask.Filing?BeanOutfit.Clerk:BeanOutfit.Office;
+            Robot=visual.gameObject.AddComponent<BusinessRobot>();Robot.Build(office.Kit.A,id,supervisor||IsSecurity,outfit);Robot.Activity=station.Activity;Robot.Seated=station.Seated;
             renderers=GetComponentsInChildren<Renderer>();nextTask=Time.time+18+id*3.17f+(float)random.NextDouble()*65;previous=transform.position;
         }
         public bool CanPickpocket(Transform player)

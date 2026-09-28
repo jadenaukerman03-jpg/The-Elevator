@@ -27,10 +27,16 @@ namespace TheElevator.Editor
      foreach(var button in buttons){Vector3 start=button.transform.position-button.transform.forward*.45f;Check(Physics.Raycast(start,button.transform.forward,out RaycastHit hit,.6f)&&hit.collider.GetComponent<ElevatorButton>()==button,"Exact ray reaches button "+button.Number);}
      Vector3 gap=(buttons[1].transform.position+buttons[2].transform.position)*.5f;Check(Physics.Raycast(gap-buttons[1].transform.forward*.45f,buttons[1].transform.forward,out RaycastHit gapHit,.6f)&&!gapHit.collider.GetComponent<ElevatorButton>(),"Aiming between numbers cannot select a floor");
      var notebook=game.GetComponentInChildren<FieldNotebook>();Check(notebook,"Physical field notebook");notebook.Open();Check(game.Player.ReadingNotebook,"Notebook can be picked up");notebook.Close();Check(!game.Player.ReadingNotebook,"Notebook returns to table");
-     Check(game.Player.Stamina==1,"Infinite stamina preserved");
+          Check(game.Player.Stamina==1,"Infinite stamina preserved");
      wait=Time.time;stage=1;return;
     }
     if(stage==1){if(Time.time-wait<.7f)return;Directory.CreateDirectory("TestResults/Office");
+     Check(game.Player.Model.gameObject.activeSelf,"Full body remains active in first person");
+     var bodyRenderers=game.Player.Model.GetComponentsInChildren<Renderer>();
+     Check(bodyRenderers.Count(r=>r.shadowCastingMode==UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly)>5,"Head and arms retain complete first-person shadow");
+     Check(bodyRenderers.Count(r=>r.shadowCastingMode==UnityEngine.Rendering.ShadowCastingMode.On)>5,"Torso and legs remain visible");
+     Check(game.Player.Hands.GetComponentsInChildren<Transform>().Count(t=>t.name=="Mitten paddle")==2,"Original game uses bean-style mitten hands");
+
      game.Player.Hands.gameObject.SetActive(false);OfficeTools.Capture(game.transform,"TestResults/Office/cabin-redesign.png",new Vector3(-2.4f,1.8f,-8.7f),new Vector3(2.6f,1.65f,-3.2f));
      foreach(MeshFilter model in game.Player.Hands.GetComponentsInChildren<MeshFilter>(true))foreach(Vector3 v in model.sharedMesh.vertices)Check(!float.IsNaN(v.x)&&!float.IsNaN(v.y)&&!float.IsNaN(v.z),"Finite hand geometry");
      game.Player.Hands.gameObject.SetActive(true);OfficeTools.Capture(game.transform,"TestResults/Office/hands-idle.png",game.Player.View.transform.position,game.Player.View.transform.position+game.Player.View.transform.forward);
@@ -49,5 +55,3 @@ namespace TheElevator.Editor
   static void Finish(bool success,string message){SessionState.SetBool(Key,false);File.WriteAllText("TestResults/Office/cabin-validation.txt",message);if(success)Debug.Log(message);else Debug.LogError(message);EditorApplication.Exit(success?0:1);}
  }
 }
-
-

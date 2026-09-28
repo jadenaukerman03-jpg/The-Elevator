@@ -59,7 +59,7 @@ namespace TheElevator.Editor
                 if (stage == 1)
                 {
                     Require(game.Phase == DescentGame.RunPhase.Exploring,"Clock In starts exploration.");
-                    Require(!game.Player.Model.gameObject.activeSelf,"First-person hides own worker body.");
+                    Require(game.Player.Model.gameObject.activeSelf&&System.Array.Exists(game.Player.Model.GetComponentsInChildren<Renderer>(),r=>r.shadowCastingMode==UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly),"First-person keeps its body, with the head reduced to a shadow.");
                     Require(Vector3.Distance(game.Player.View.transform.position,game.Player.transform.position + Vector3.up * 1.7f) < 0.08f,"First-person eye height.");
                     ObjectiveTerminal terminal = game.CurrentMap.GetComponentInChildren<ObjectiveTerminal>();
                     Require(terminal != null,"Survey objective exists.");

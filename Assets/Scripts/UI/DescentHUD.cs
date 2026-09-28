@@ -7,7 +7,7 @@ namespace TheElevator
         DescentGame game;
         GUIStyle title, heading, body, small, button;
         int suit;
-        readonly string[] suitNames = { "SAFETY YELLOW", "QUESTIONABLE MINT", "BRUISE PURPLE", "INCIDENT RED" };
+        readonly string[] suitNames = { "SAFETY YELLOW / HARD HAT", "QUESTIONABLE MINT / BEANIE", "BRUISE PURPLE / BALL CAP", "INCIDENT RED / GOGGLES" };
         public void Initialize(DescentGame owner) { game = owner; }
 
         void Styles()

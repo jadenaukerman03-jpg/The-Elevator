@@ -38,6 +38,7 @@ namespace TheElevator.SoftOffice
    var cargo=a.Round(transform,"Mandatory cargo sample",new Vector3(3.8f,.94f,-1.4f),new Vector3(1.05f,.82f,.8f),a.Coral,.19f,true);a.Round(cargo.transform,"Big latch",new Vector3(0,.03f,-.43f),new Vector3(.3f,.25f,.1f),a.Gold,.049f);cargo.AddComponent<SoftPickup>().Setup("Prototype printer cartridge",2.8f);
    var guide=a.Round(transform,"Physical testing card",new Vector3(0,1,-4.1f),new Vector3(1.65f,1.0f,.1f),a.Cream,.049f);a.Round(transform,"Guide stand",new Vector3(0,.48f,-4.03f),new Vector3(.12f,.95f,.16f),a.Teal,.059f,true);a.Round(transform,"Guide foot",new Vector3(0,.07f,-4.03f),new Vector3(.7f,.14f,.5f),a.Teal,.065f);
    a.Print(guide.transform,"SOFT OFFICE\n\nWASD MOVE / SHIFT RUN\nCLICK OR E: PICK UP / DROP\nHOLD Q: TOSS / ESC: RELEASE MOUSE",new Vector3(0,0,-.056f),.019f,a.Ink);
+   SoftOfficeIdentity.Build(transform,a);
    if(playable){var player=a.Group(transform,"Soft target player",new Vector3(0,.12f,-5.7f));Player=player.gameObject.AddComponent<SoftTargetPlayer>();Player.Build(a);}
   }
   void Desk(SoftArt a)
@@ -61,5 +62,3 @@ namespace TheElevator.SoftOffice
   void OnDestroy(){if(Art!=null)Art.Dispose();}
  }
 }
-
-

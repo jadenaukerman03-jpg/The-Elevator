@@ -2,20 +2,20 @@ using UnityEngine;
 
 namespace TheElevator.Office
 {
-    // Office staff wear the shared bean rig in jacket and tie; this adapter keeps the employee-facing API.
+    // Office staff wear the shared bean rig, dressed for their job; this adapter keeps the employee-facing API.
     public sealed class BusinessRobot : MonoBehaviour
     {
         static readonly Color[] Jackets = {
             new Color(.20f,.30f,.52f), new Color(.14f,.47f,.50f), new Color(.47f,.25f,.45f), new Color(.82f,.60f,.22f)
         };
+        static readonly Color[] Blouses = { new Color(.93f,.45f,.45f), new Color(.30f,.62f,.80f), new Color(.98f,.72f,.30f) };
+        static readonly Color[] Cardigans = { new Color(.80f,.60f,.22f), new Color(.45f,.60f,.45f), new Color(.70f,.35f,.25f) };
         static readonly Color SupervisorJacket = new Color(.22f,.22f,.27f);
         static readonly Color SupervisorTie = new Color(.90f,.22f,.20f);
         static readonly Color Tie = new Color(1f,.80f,.28f);
         BeanRig rig;
         public Transform RightHand { get { return rig ? rig.RightHand : null; } }
         public Transform Head { get { return rig ? rig.Head : null; } }
-        public Color SkinColor { get; private set; }
-        public Color JacketColor { get; private set; }
         public Vector3 ReachTarget;
         public bool Reaching;
         public bool Talking;
@@ -23,12 +23,19 @@ namespace TheElevator.Office
         public bool Seated;
         public float Speed;
         public Vector3 LookTarget;
-        public void Build(OfficeArt a,int variant,bool supervisor,Color? skin=null)
+        public void Build(OfficeArt a,int variant,bool supervisor,BeanOutfit outfit=BeanOutfit.Office)
         {
-            SkinColor=skin??BeanRig.SkinColors[(variant*5+2)%BeanRig.SkinColors.Length];
-            JacketColor=supervisor?SupervisorJacket:Jackets[variant%Jackets.Length];
+            BeanLook look=new BeanLook{Outfit=outfit,Skin=BeanRig.SkinColors[(variant*5+2)%BeanRig.SkinColors.Length],Eyes=variant%3,Mouth=variant%4};
+            switch(outfit)
+            {
+                case BeanOutfit.Reception:look.Primary=Blouses[variant%Blouses.Length];look.Accent=new Color(.20f,.21f,.25f);break;
+                case BeanOutfit.Technician:look.Primary=new Color(.95f,.55f,.20f);look.Accent=new Color(.62f,.66f,.72f);break;
+                case BeanOutfit.Clerk:look.Primary=Cardigans[variant%Cardigans.Length];look.Accent=new Color(.55f,.18f,.20f);break;
+                case BeanOutfit.Security:look.Primary=new Color(.16f,.20f,.34f);look.Accent=new Color(.11f,.14f,.24f);break;
+                default:look.Primary=supervisor?SupervisorJacket:Jackets[variant%Jackets.Length];look.Accent=supervisor?SupervisorTie:Tie;break;
+            }
             rig=gameObject.AddComponent<BeanRig>();
-            rig.Build(new BeanLook{Outfit=BeanOutfit.Office,Skin=SkinColor,Primary=JacketColor,Accent=supervisor?SupervisorTie:Tie,Eyes=variant%3,Mouth=variant%4},variant);
+            rig.Build(look,variant);
             float height=1+(variant%5-2)*.025f; transform.localScale=new Vector3(1+(variant%3-1)*.055f,height,1);
         }
         public void Animate(float dt)

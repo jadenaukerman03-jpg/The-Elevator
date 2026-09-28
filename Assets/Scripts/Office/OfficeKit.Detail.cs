@@ -23,11 +23,12 @@ namespace TheElevator.Office
                 for(int line=0;line<4;line++)A.Box(sheet,"Memo fine print",new Vector3(-.03f,-.1f-line*.045f,-.014f),new Vector3(.38f-line*.025f,.009f,.004f),A.Dark);
                 A.Round(sheet,"Notice pin",new Vector3(0,.36f,-.021f),new Vector3(.028f,.028f,.017f),A.Red,PrimitiveType.Sphere);
             }
-            Transform clock=A.Group(root,"Department clock",new Vector3(4.2f,2.95f,5.62f));
-            A.Box(clock,"Clock case",Vector3.zero,new Vector3(.68f,.39f,.08f),A.Dark);
-            A.Box(clock,"Clock display",new Vector3(0,0,-.049f),new Vector3(.59f,.28f,.012f),A.Screen);
-            A.Label(clock,(8+room.Id%4).ToString("00")+":"+(room.Id*7%60).ToString("00"),new Vector3(0,0,-.064f),.073f);
-            A.Label(root,"M / "+OfficePlan.Departments[info.Department]+"\n"+info.Kind.ToString().ToUpper()+"  "+room.Id.ToString("000"),new Vector3(3.2f,1.52f,-5.67f),.031f,null,180);
+            Transform clock=A.Group(root,"Oversized department clock",new Vector3(-3.3f,3.35f,5.58f));
+            A.Round(clock,"Clock face",Vector3.zero,new Vector3(1.2f,1.2f,.08f),A.Paper,PrimitiveType.Sphere);
+            A.W.Soft.Ring(clock,"Plum clock rim",Vector3.zero,.59f,.055f,A.W.Soft.Plum);
+            A.Box(clock,"Minute hand",new Vector3(.1f,.12f,-.075f),new Vector3(.075f,.45f,.035f),A.Red).transform.localRotation=Quaternion.Euler(0,0,-32);
+            A.Box(clock,"Hour hand",new Vector3(-.11f,0,-.09f),new Vector3(.30f,.085f,.04f),A.Dark);
+            for(int mark=0;mark<4;mark++){float angle=mark*Mathf.PI*.5f;A.Round(clock,"Clock marker",new Vector3(Mathf.Cos(angle)*.47f,Mathf.Sin(angle)*.47f,-.07f),new Vector3(.075f,.075f,.025f),A.Brass,PrimitiveType.Sphere);}            A.Label(root,"M / "+OfficePlan.Departments[info.Department]+"\n"+info.Kind.ToString().ToUpper()+"  "+room.Id.ToString("000"),new Vector3(3.2f,1.52f,-5.67f),.031f,null,180);
             // Slim safety equipment on the perimeter; never in the central transit cross.
             Transform safety=A.Group(root,"Safety station",new Vector3(-5.55f,0,-4.9f),90);
             A.Box(safety,"Fire equipment backing",new Vector3(0,1.05f,0),new Vector3(.43f,.9f,.055f),A.Dark);
@@ -110,5 +111,3 @@ namespace TheElevator.Office
         }
     }
 }
-
-

@@ -19,11 +19,11 @@ namespace TheElevator
         public void Build(DescentGame owner,Workshop w,Transform left,Transform right)
         {
             game=owner;
-            Color metal=new Color(.43f,.46f,.47f);
+            Color metal=new Color(.16f,.53f,.53f);
             for(int side=-1;side<=1;side+=2)
             {
                 for(int panel=0;panel<6;panel++)w.Shape("Brushed steel wall panel",transform,new Vector3(side*4.35f,1.8f,-9.3f+panel*1.18f),new Vector3(.035f,3.3f,1.14f),metal);
-                w.Shape("Continuous handrail",transform,new Vector3(side*4.12f,1.05f,side>0?-7.55f:-6.6f),new Vector3(.065f,.07f,side>0?3.5f:5.4f),Workshop.Cream);
+                w.Shape("Continuous handrail",transform,new Vector3(side*4.12f,1.05f,side>0?-7.55f:-6.6f),new Vector3(.12f,.13f,side>0?3.5f:5.4f),Workshop.Cream);
                 for(int bracket=0;bracket<(side>0?3:4);bracket++)w.Shape("Handrail mounting bracket",transform,new Vector3(side*4.23f,1.02f,-9+bracket*1.6f),new Vector3(.23f,.06f,.06f),metal);
                 w.Shape("Cabin skirting",transform,new Vector3(side*4.3f,.16f,-6.2f),new Vector3(.05f,.25f,7.2f),Workshop.Ink);
             }
@@ -57,4 +57,3 @@ namespace TheElevator
         void Update(){if(glass)glass.SetFloat("_Travel",game.Phase==DescentGame.RunPhase.Transit?1:0);}
     }
 }
-

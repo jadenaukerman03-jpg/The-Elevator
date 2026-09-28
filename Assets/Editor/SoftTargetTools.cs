@@ -12,6 +12,14 @@ namespace TheElevator.Editor
   public const string Scene="Assets/Scenes/SoftOfficeTarget.unity";
   [MenuItem("The Elevator/Art Direction/Open Soft Office Target")]
   public static void Open(){if(!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())return;Create();EditorSceneManager.OpenScene(Scene);}
+  [MenuItem("The Elevator/Play Latest Target",false,0)]
+  public static void Play()
+  {
+   if(EditorApplication.isPlaying){EditorApplication.playModeStateChanged-=ResumePlay;EditorApplication.playModeStateChanged+=ResumePlay;EditorApplication.isPlaying=false;return;}
+   if(!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())return;
+   OfficeTools.CreateAssets();EditorSceneManager.OpenScene(OfficeTools.ScenePath);EditorApplication.isPlaying=true;
+  }
+  static void ResumePlay(PlayModeStateChange state){if(state!=PlayModeStateChange.EnteredEditMode)return;EditorApplication.playModeStateChanged-=ResumePlay;EditorApplication.delayCall+=Play;}
   public static void Create(){if(File.Exists(Scene))return;EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);new GameObject("Soft office visual target").AddComponent<SoftOfficeTarget>();EditorSceneManager.SaveScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene(),Scene);}
   public static void Render()
   {
@@ -21,7 +29,10 @@ namespace TheElevator.Editor
    var playerRoot=new GameObject("First person study");playerRoot.transform.SetParent(root.transform);playerRoot.transform.position=new Vector3(.5f,.15f,-2.6f);var player=playerRoot.AddComponent<SoftTargetPlayer>();player.Build(target.Art);player.SendMessage("LateUpdate");
    // Explicitly position viewmodel for edit-mode capture (delta time is zero).
    player.LeftHand.position=player.View.transform.TransformPoint(new Vector3(-.27f,-.31f,.56f));player.RightHand.position=player.View.transform.TransformPoint(new Vector3(.27f,-.31f,.56f));player.LeftHand.rotation=Quaternion.Euler(35,12,12);player.RightHand.rotation=Quaternion.Euler(35,-12,-12);
+   player.LeftHand.GetComponent<SoftGlove>().Pose(false,0);player.RightHand.GetComponent<SoftGlove>().Pose(false,0);
    Capture(root.transform,"TestResults/SoftOffice/first-person.png",player.View.transform.position,player.View.transform.position+Vector3.forward);
+   player.LeftHand.gameObject.SetActive(false);player.RightHand.gameObject.SetActive(false);
+   Capture(root.transform,"TestResults/SoftOffice/looking-down.png",player.View.transform.position,playerRoot.transform.position+new Vector3(0,0,.4f));
    foreach(MeshFilter filter in root.GetComponentsInChildren<MeshFilter>())foreach(Vector3 v in filter.sharedMesh.vertices)if(float.IsNaN(v.x)||float.IsNaN(v.y)||float.IsNaN(v.z))throw new Exception("Invalid target geometry");
    Debug.Log("SOFT TARGET RENDER PASS / finite meshes / "+root.GetComponentsInChildren<SoftRobot>().Length+" original robots / "+root.GetComponentsInChildren<SoftPickup>().Length+" physical props");UnityEngine.Object.DestroyImmediate(root);
   }
@@ -35,4 +46,3 @@ namespace TheElevator.Editor
   public static void Build(){Create();Directory.CreateDirectory("Builds/SoftOffice");var report=BuildPipeline.BuildPlayer(new BuildPlayerOptions{scenes=new[]{Scene},locationPathName="Builds/SoftOffice/SoftOfficeTarget.exe",target=BuildTarget.StandaloneWindows64,options=BuildOptions.Development});if(report.summary.result!=BuildResult.Succeeded)throw new Exception("Soft target build failed");Debug.Log("SOFT TARGET BUILD PASS");}
  }
 }
-
