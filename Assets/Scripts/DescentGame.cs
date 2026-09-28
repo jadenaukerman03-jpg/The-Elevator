@@ -226,17 +226,12 @@ namespace TheElevator
                 string kind = socket.Kind == SocketKind.Supply ? "battery" : (socket.ContentSeed & 3) == 0 ? "safe" : (socket.ContentSeed & 3) == 1 ? "artifact" : "case";
                 builder.Item(floor, floor.InverseTransformPoint(socket.transform.position + Vector3.up), kind, FloorIndex);
             }
-            else if (socket.Kind == SocketKind.Hazard)
-            {
-                GameObject plate = workshop.Shape("Unstable circuit", socket.transform, new Vector3(0,0.1f,0), new Vector3(2.5f,0.12f,2.5f), Workshop.Yellow, PrimitiveType.Cube, false);
-                plate.AddComponent<ElectricalHazard>().Initialize(this, workshop, (socket.ContentSeed & 255) / 50f);
-            }
             else if (socket.Kind == SocketKind.Enemy)
             {
                 Transform root = workshop.Group("Custodian / " + socket.StableId, floor, floor.InverseTransformPoint(socket.transform.position + Vector3.up * 0.1f));
                 Custodian guard = root.gameObject.AddComponent<Custodian>(); guard.Initialize(this, workshop, true); Guards.Add(guard);
             }
-            // Event/restricted-zone sockets are extension points, not pretend implemented mechanics.
+            // Hazard, event and restricted-zone sockets are extension points; nothing is placed on the floor for them.
         }
 
         public void RegenerateMap(int requestedSeed, MapSize size, bool replayPrevious)
@@ -310,7 +305,7 @@ namespace TheElevator
         {
             Phase = RunPhase.Closing;
             ClosingProgress = 0;
-            Notify("DOORS CLOSING. Stand completely behind the yellow threshold.");
+            Notify("DOORS CLOSING. Get all the way inside the elevator.");
             Sound.Play(330, 0.4f, 0.18f);
         }
 
@@ -365,7 +360,7 @@ namespace TheElevator
             lastAlarm = -1;
             Player.Recover();
             Phase = RunPhase.Exploring;
-            Notify(FloorIndex == 1 ? "Flooded laboratory. Green plates are safe; red plates are live."
+            Notify(FloorIndex == 1 ? "Flooded laboratory. Mind the specimen tanks."
                 : "Human Resources. Walk quietly. The custodian hears sprinting and impacts.");
             Sound.Play(740, 0.25f, 0.13f);
         }

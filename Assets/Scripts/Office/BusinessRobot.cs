@@ -23,6 +23,15 @@ namespace TheElevator.Office
         public bool Seated;
         public float Speed;
         public Vector3 LookTarget;
+        public Vector3 PointAt;
+        public int Mood=1;
+        public void HoldPointer()
+        {
+            if(!rig)return;
+            Transform hand=rig.Hand(1);
+            rig.Add(hand,"Pointer stick",BeanRig.Capsule(1.05f,.013f,.008f),new Vector3(0,-.07f,.02f),Vector3.one,new Color(.55f,.36f,.2f));
+            rig.Add(hand,"Pointer tip",BeanRig.Sphere(),new Vector3(0,-1.12f,.02f),Vector3.one*.025f,BeanRig.FaceInk);
+        }
         public void Build(OfficeArt a,int variant,bool supervisor,BeanOutfit outfit=BeanOutfit.Office)
         {
             BeanLook look=new BeanLook{Outfit=outfit,Skin=BeanRig.SkinColors[(variant*5+2)%BeanRig.SkinColors.Length],Eyes=variant%3,Mouth=variant%4,
@@ -44,9 +53,11 @@ namespace TheElevator.Office
             if(!rig) return;
             bool work=Speed<.15f;
             bool desk=work&&(Activity==OfficeTask.Typing||Activity==OfficeTask.Reception),coffee=work&&Activity==OfficeTask.Coffee;
+            bool pointing=work&&Activity==OfficeTask.Present&&PointAt!=Vector3.zero;
+            rig.SetMood(Mood);
             rig.Animate(dt,new BeanPose{
                 Speed=Speed,Seated=Seated,Talking=Talking,Typing=work&&Activity==OfficeTask.Typing,
-                Reaching=Reaching,ReachTarget=ReachTarget,LookTarget=LookTarget,
+                Reaching=Reaching||pointing,ReachTarget=pointing?PointAt:ReachTarget,LookTarget=LookTarget,
                 ArmPitch=desk?-40:coffee?-60:0,ElbowBend=desk?-60:coffee?-95:-12});
         }
     }

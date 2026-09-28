@@ -95,8 +95,11 @@ namespace TheElevator.Office
             foreach(OfficeTaskPoint task in Stations)
             {
                 if(task.RoomId<2||loot>=Math.Max(6,Map.Manifest.Rooms.Count/3)||task.Activity!=OfficeTask.Typing)continue;
-                Vector3 p=task.transform.position+task.transform.right*.68f+task.transform.forward*.85f+Vector3.up*1.07f;
-                Transform asset=Kit.A.Group(transform,"Optional office property",transform.InverseTransformPoint(p));
+                // Loot rests on the desk top, in the clear gap between the paperwork, keyboard and monitor.
+                Transform desk=task.transform.parent;
+                float height=loot%3==0?.14f:loot%3==1?.42f:.05f;
+                Vector3 p=desk.TransformPoint(new Vector3(-.3f,.82f+height*.5f+.005f,.1f));
+                Transform asset=Kit.A.Group(transform,"Optional office property",transform.InverseTransformPoint(p));asset.rotation=desk.rotation;
                 string title;Vector3 lootSize;float mass;int price;
                 if(loot%3==0)
                 {
@@ -112,10 +115,9 @@ namespace TheElevator.Office
                 }
                 else
                 {
-                    title="Portable executive terminal";lootSize=new Vector3(.62f,.42f,.3f);mass=11;price=340;
-                    Kit.A.Box(asset,"Portable terminal shell",Vector3.zero,lootSize,Kit.A.Plastic);
-                    Kit.A.Box(asset,"Portable terminal screen",new Vector3(0,.035f,-.157f),new Vector3(.5f,.23f,.01f),Kit.A.Screen);
-                    Kit.A.Box(asset,"Carrying handle",new Vector3(0,.24f,0),new Vector3(.25f,.045f,.055f),Kit.A.Dark);
+                    title="Executive laptop";lootSize=new Vector3(.4f,.05f,.28f);mass=3;price=340;
+                    Kit.A.Box(asset,"Laptop shell",Vector3.zero,lootSize,Kit.A.Dark);
+                    Kit.A.Box(asset,"Laptop lid logo",new Vector3(0,.026f,0),new Vector3(.08f,.004f,.08f),Kit.A.Brass);
                 }
                 SalvageItem value=asset.gameObject.AddComponent<SalvageItem>();value.Configure(Game,title,mass,price,false,lootSize);
                 OfficeCargo cargo=asset.gameObject.AddComponent<OfficeCargo>();cargo.Initialize(this,value,false);loot++;
@@ -182,6 +184,7 @@ namespace TheElevator.Office
                 if(Input.GetKeyDown(KeyCode.B)&&Time.time>nextBluff)
                 { Questioner.Suspicion=Mathf.Max(0,Questioner.Suspicion-(BadgeLevel>=2?25:10));nextBluff=Time.time+20;Game.Notify("Identity check deferred. Try looking busy."); }
             }
+            CheckMeetingEntry(Time.deltaTime);
             if(Transported)Prompt="DOLLY ATTACHED / WALK BACKWARD TO PULL / Q RELEASE";
             if(Time.time>nextDecay){nextDecay=Time.time+8;SecurityAlert=Mathf.Max(0,SecurityAlert-1);}
         }
@@ -235,15 +238,12 @@ namespace TheElevator.Office
         void OnGUI()
         {
             if(!Game||!Game.ControlsActive)return;
-            if(Plan.MeetingRoom>=0&&Vector3.Distance(Game.Player.transform.position,Map.Center(Map.Manifest.Rooms[Plan.MeetingRoom]))<10)
-                GUI.Box(new Rect(Screen.width*.5f-300,Screen.height-205,600,35),"MEETING: "+MeetingLine);
-            float suspicion=SuspicionLevel;Color saved=GUI.color;
-            GUI.Box(new Rect(Screen.width-290,25,265,72),"SUSPICION / "+Mathf.RoundToInt(suspicion)+"%");
-            GUI.color=new Color(.13f,.16f,.16f);GUI.DrawTexture(new Rect(Screen.width-274,56,233,16),Texture2D.whiteTexture);
-            GUI.color=Color.Lerp(new Color(.75f,.73f,.23f),new Color(.9f,.15f,.08f),suspicion/100);GUI.DrawTexture(new Rect(Screen.width-274,56,233*suspicion/100,16),Texture2D.whiteTexture);GUI.color=saved;
-            GUI.Label(new Rect(Screen.width-274,75,235,20),suspicion>55?"REPORTED / SECURITY RISK":suspicion>20?"WATCHED / EXPLAIN YOURSELF":"UNNOTICED");
+            // The presenter's words, shown as a subtitle while you are in the room with them.
+            if(playerInMeeting)
+                GUI.Box(new Rect(Screen.width*.5f-300,Screen.height-205,600,35),"PRESENTER: "+MeetingLine);
+            // No anger or suspicion counters: read each employee's face instead.
             GUI.Box(new Rect(20,Screen.height-154,560,114),"");
-            GUI.Label(new Rect(34,Screen.height-146,530,100),"CONTRACT / "+Plan.TargetName.ToUpper()+"\n"+(RequiredRecovered?"REQUIRED ASSET SECURED":"MANDATORY / ROOM "+Plan.TargetRoom.ToString("000"))+"   |   COVER: FACILITIES ASSISTANT\nBADGE "+BadgeLevel+"   SECURITY "+SecurityAlert+"   "+(Blending?"LOOKING PRODUCTIVE":""));
+            GUI.Label(new Rect(34,Screen.height-146,530,100),"CONTRACT / "+Plan.TargetName.ToUpper()+"\n"+(RequiredRecovered?"REQUIRED ASSET SECURED":"MANDATORY / ROOM "+Plan.TargetRoom.ToString("000"))+"   |   COVER: FACILITIES ASSISTANT\nBADGE "+BadgeLevel+"   "+(Blending?"LOOKING PRODUCTIVE":""));
         }
         void OnDestroy(){if(officeHum)Destroy(officeHum);if(tone)Destroy(tone);}
     }

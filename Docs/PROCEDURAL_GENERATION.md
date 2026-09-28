@@ -18,7 +18,7 @@ Direction: **Civic Works**, an oversized municipal building whose records, utili
 | Content planning | Separate seeded streams in macro generator | Stable socket IDs, kinds, slots and content seeds |
 | Geometry | Generation/FloorGeometryBuilder.cs | Shells, matching openings, connectors, stairs and interiors |
 | Runtime map | Generation/GeneratedFloor.cs | World positions, graph routes, surveys, visibility, mesh cleanup |
-| Gameplay | DescentGame.PopulateSocket | Existing salvage, batteries, custodians and electrical plates |
+| Gameplay | DescentGame.PopulateSocket | Existing salvage, batteries and custodians (hazard sockets place nothing) |
 | Replay | Generation/GenerationRecordStore.cs | Complete recipes, fingerprints and failed-seed logs |
 | Tools | Editor/GenerationLabWindow.cs and GenerationDebugPanel.cs | Graphs, replay, preview and export |
 
@@ -32,7 +32,7 @@ Graph distances place objectives far from extraction and from one another. Optio
 
 Departments occupy spatial bands and select among weighted eligible module IDs. Layout, module selection, content and interior dressing use separate streams. Changing prop density does not rearrange the building.
 
-Loops offer local route alternatives. Inter-level stairs remain bottlenecks; two edge-disjoint extraction paths from every room are not guaranteed. Shortcut marks an open reconnecting route with a mint threshold. RestrictedZone and Event sockets are metadata only; no locked-door or event mechanic is claimed.
+Loops offer local route alternatives. Inter-level stairs remain bottlenecks; two edge-disjoint extraction paths from every room are not guaranteed. Shortcut marks an open reconnecting route. RestrictedZone and Event sockets are metadata only; no locked-door or event mechanic is claimed.
 
 ## Profiles and dimensions
 

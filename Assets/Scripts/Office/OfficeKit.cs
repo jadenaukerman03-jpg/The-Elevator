@@ -9,7 +9,8 @@ namespace TheElevator.Office
         public readonly OfficePlan Plan;
         readonly GeneratedFloor floor;
         readonly System.Collections.Generic.HashSet<int> recoverableRooms=new System.Collections.Generic.HashSet<int>();
-        static readonly Vector3[] corners={new Vector3(-3.5f,0,-3.5f),new Vector3(3.5f,0,3.5f),new Vector3(-3.5f,0,3.5f),new Vector3(3.5f,0,-3.5f)};
+        // Furniture clusters sit close to the walls, leaving the room centre and door lanes open.
+        static readonly Vector3[] corners={new Vector3(-4.1f,0,-4.1f),new Vector3(4.1f,0,4.1f),new Vector3(-4.1f,0,4.1f),new Vector3(4.1f,0,-4.1f)};
         public OfficeKit(Workshop w,GeneratedFloor target)
         { A=new OfficeArt(w); floor=target; Plan=OfficePlan.Build(target.Manifest); }
         public void Dress(Transform geometry,MapRoom room,float height)
@@ -23,8 +24,10 @@ namespace TheElevator.Office
                 renderer.sharedMaterial=renderer.name.Contains("Floor")||renderer.name.Contains("landing")||renderer.name.Contains("gallery") ? (publicArea?A.Tile:A.Carpet)
                     :renderer.name.Contains("stripe")||renderer.name.Contains("frame") ? departmentAccent :renderer.name.Contains("Ceiling")?A.Plaster:A.Plaster;
             // Complete wall bays: wainscot, skirting, crown, inset panels, outlets and a service rail.
+            int annexSide=room.Id==Plan.MeetingRoom?Plan.MeetingAnnexSide:-1;
             for(int side=0;side<4;side++)
             {
+                if(side==annexSide)continue;
                 Transform wall=A.Group(geometry,"Finished wall bay",Vector3.zero,side*90);
                 for(int sign=-1;sign<=1;sign+=2)
                 {
@@ -70,21 +73,28 @@ namespace TheElevator.Office
                 A.Round(geometry,"Sprinkler",new Vector3(3,height-.23f,3),new Vector3(.1f,.06f,.1f),A.Brass);
             }
             if(room.IsStair) return;
-            RoomDetails(geometry,room,info);
+            // A two-cell meeting room turns its wall dressing to face the door end; the far end is open to the extension.
+            Transform dress=annexSide>=0?A.Group(geometry,"Meeting room dressing",Vector3.zero,((annexSide+2)%4)*90):geometry;
+            RoomDetails(dress,room,info);
             if(room.Has(RoomRole.Landmark))
             {
                 Transform landmark=A.Group(geometry,"Landmark / corporate memory",new Vector3(0,height-.8f,0));
                 // Suspended sculpture keeps the extraction cross unobstructed below 2.8 m.
                 A.Round(landmark,"Corporate memory disc",Vector3.zero,new Vector3(1.35f,.045f,1.35f),departmentAccent);
                 for(int i=0;i<4;i++){Transform vane=A.Group(landmark,"Sculpture vane",Vector3.zero,i*90+room.Id%30);A.Box(vane,"Brass memory fin",new Vector3(.55f,.1f,0),new Vector3(.07f,.4f,.8f),A.Brass);}
-                A.Label(geometry,"CORPORATE MEMORY / "+room.Id.ToString("000"),new Vector3(0,3.38f,5.6f),.041f);
+                A.Box(dress,"Memory plaque",new Vector3(0,3.44f,5.76f),new Vector3(2.7f,.34f,.05f),A.Dark);
+                A.Label(dress,"CORPORATE MEMORY / "+room.Id.ToString("000"),new Vector3(0,3.44f,5.73f),.041f);
             }
             // Preserve every generated doorway route and planned content corner.
-            for(int slot=0;slot<4;slot++)
+            if(annexSide>=0)MeetingRoom(geometry,room.Id,annexSide,height);
+            else for(int slot=0;slot<4;slot++)
             {
                 bool reserved=floor.Manifest.Sockets.Exists(s=>s.RoomId==room.Id&&s.Slot==slot);
                 if(reserved || (room.Id==Plan.TargetRoom && slot==1)) continue;
-                Transform cluster=A.Group(geometry,"Office cluster / "+info.Kind+" / "+slot,corners[slot]);
+                // Every cluster puts its back (boards, cabinets, splashbacks, desk dividers) toward the nearest wall.
+                // Public rooms keep a walkway behind the reception counter.
+                Vector3 corner=publicArea?corners[slot]*(3.5f/4.1f):corners[slot];
+                Transform cluster=A.Group(geometry,"Office cluster / "+info.Kind+" / "+slot,corner,corner.z<0?180:0);
                 switch(info.Kind)
                 {
                     case OfficeRoomKind.Lobby: if(slot==2) Reception(cluster,room.Id); else Lounge(cluster); break;
@@ -104,7 +114,7 @@ namespace TheElevator.Office
                 }
             }
             // Partial-height glazed department partitions surround furniture, not transit lanes.
-            if(info.Kind==OfficeRoomKind.Workroom||info.Kind==OfficeRoomKind.Conference||info.Kind==OfficeRoomKind.Executive)
+            if(annexSide<0&&(info.Kind==OfficeRoomKind.Workroom||info.Kind==OfficeRoomKind.Conference||info.Kind==OfficeRoomKind.Executive))
             {
                 for(int side=-1;side<=1;side+=2)
                 {
@@ -115,17 +125,17 @@ namespace TheElevator.Office
                     A.Box(partition,"Partition top rail",new Vector3(0,3,0),new Vector3(3.7f,.045f,.065f),A.Dark);
                 }
             }
-            Transform wallDisplay=A.Group(geometry,"Corporate communications",new Vector3(-4.15f,0,5.58f));
+            Transform wallDisplay=A.Group(dress,"Corporate communications",new Vector3(-4.15f,0,5.58f));
             A.Box(wallDisplay,"Corporate display frame",new Vector3(0,2.2f,0),new Vector3(2.25f,1.05f,.12f),A.Dark);
             A.Box(wallDisplay,"Corporate display",new Vector3(0,2.2f,-.07f),new Vector3(2.1f,.91f,.018f),A.Screen);
             A.Label(wallDisplay,room.Id==0?Plan.Config.Corporation:"PRODUCTIVITY / "+(91+room.Id%9)+"%",new Vector3(0,2.43f,-.09f),.055f);
             A.Label(wallDisplay,room.Id%3==0?"YOUR BREAK HAS BEEN OPTIMIZED.":"PLEASE ENJOY YOUR ASSIGNED PURPOSE.",new Vector3(0,2.1f,-.09f),.025f);
             A.Label(wallDisplay,"M / "+Plan.Config.Slogan,new Vector3(0,1.91f,-.09f),.018f);
-            Plant(geometry,new Vector3(5.25f,0,-.9f));
+            Plant(dress,new Vector3(5.25f,0,-.9f));
             // Controlled story cluster: a boxed-up employee rather than random debris.
             if(room.Id%7==3)
             {
-                Transform story=A.Group(geometry,"Story / employee relocated",new Vector3(-5.25f,0,.9f));
+                Transform story=A.Group(dress,"Story / employee relocated",new Vector3(-5.25f,0,.9f));
                 A.Box(story,"Personal effects carton",new Vector3(0,.3f,0),new Vector3(.65f,.6f,.55f),A.Wood);
                 A.Box(story,"Abandoned award",new Vector3(.08f,.78f,0),new Vector3(.12f,.4f,.12f),A.Brass);
                 A.Label(story,"EMPLOYEE 042\nREASSIGNED TO STORAGE",new Vector3(0,.38f,-.29f),.019f);
@@ -143,7 +153,6 @@ namespace TheElevator.Office
             }
             A.Box(root,"Connector light recess",new Vector3(0,3.18f,0),new Vector3(.5f,.06f,Mathf.Min(1.4f,length)),A.Dark);
             A.Box(root,"Connector opal fixture",new Vector3(0,3.14f,0),new Vector3(.4f,.018f,Mathf.Min(1.3f,length)),A.CoolLight);
-            A.Box(root,"Floor transition strip",new Vector3(0,.015f,0),new Vector3(width,.025f,.065f),A.Brass);
         }
         public void Desk(Transform t,int room,bool cubicle)
         {
@@ -313,7 +322,7 @@ namespace TheElevator.Office
                 A.Box(t,"Rack service label",new Vector3(-.16f,.22f+i*.19f,-.224f),new Vector3(.22f,.035f,.01f),A.Paper);
                 for(int side=-1;side<=1;side+=2)A.Box(t,"Rack grab handle",new Vector3(side*.40f,.22f+i*.19f,-.24f),new Vector3(.025f,.095f,.04f),A.Dark);
                 if(Plan.Config.Quality>=OfficeQuality.High)for(int vent=0;vent<5;vent++)A.Box(t,"Rack cooling grille",new Vector3(-.29f+vent*.065f,.26f+i*.19f,-.226f),new Vector3(.03f,.012f,.012f),A.Dark);
-                A.Box(t,"Cable loom",new Vector3(.58f,.23f+i*.17f,.1f),new Vector3(.06f,.06f,.42f),A.Red);
+                A.Box(t,"Cable loom",new Vector3(.55f,.23f+i*.17f,.1f),new Vector3(.06f,.06f,.42f),A.Red);
             }
         }
         void Shelves(Transform t)
@@ -333,18 +342,20 @@ namespace TheElevator.Office
         }
         void Washroom(Transform t)
         {
+            // Mirrors, dispensers and the sign mount on a full-height splashback, never in mid air.
+            A.Box(t,"Washroom splashback",new Vector3(0,1.3f,.8f),new Vector3(2.15f,2.6f,.06f),A.Tile);
             A.Box(t,"Vanity counter",new Vector3(0,.82f,.3f),new Vector3(1.95f,.12f,.72f),A.Tile,true);
             for(int side=-1;side<=1;side+=2)
             {
                 A.Round(t,"Inset basin",new Vector3(side*.5f,.89f,.24f),new Vector3(.55f,.045f,.43f),A.Plastic);
                 A.Box(t,"Automatic faucet",new Vector3(side*.5f,1.01f,.49f),new Vector3(.045f,.26f,.16f),A.Metal);
-                A.Box(t,"Mirror",new Vector3(side*.5f,1.65f,.72f),new Vector3(.74f,.94f,.025f),A.Metal);
+                A.Box(t,"Mirror",new Vector3(side*.5f,1.65f,.755f),new Vector3(.74f,.94f,.025f),A.Metal);
             }
-            A.Box(t,"Soap dispenser",new Vector3(0,1.3f,.64f),new Vector3(.22f,.32f,.14f),A.Plastic);
-            A.Box(t,"Soap level window",new Vector3(0,1.29f,.56f),new Vector3(.06f,.17f,.015f),A.Screen);
-            A.Box(t,"Towel dispenser",new Vector3(.94f,1.46f,.60f),new Vector3(.26f,.35f,.18f),A.Metal);
-            A.Box(t,"Paper towel",new Vector3(.94f,1.2f,.58f),new Vector3(.20f,.19f,.015f),A.Paper);
-            A.Label(t,"HANDWASH CYCLE / 40 SECONDS",new Vector3(0,2.3f,.68f),.027f);
+            A.Box(t,"Soap dispenser",new Vector3(0,1.3f,.70f),new Vector3(.22f,.32f,.14f),A.Plastic);
+            A.Box(t,"Soap level window",new Vector3(0,1.29f,.625f),new Vector3(.06f,.17f,.015f),A.Screen);
+            A.Box(t,"Towel dispenser",new Vector3(.94f,1.46f,.68f),new Vector3(.26f,.35f,.18f),A.Metal);
+            A.Box(t,"Paper towel",new Vector3(.94f,1.2f,.66f),new Vector3(.20f,.19f,.015f),A.Paper);
+            A.Label(t,"HANDWASH CYCLE / 40 SECONDS",new Vector3(0,2.3f,.765f),.027f);
         }
         public void Vending(Transform t)
         {

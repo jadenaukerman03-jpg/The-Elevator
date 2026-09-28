@@ -54,6 +54,10 @@ namespace TheElevator
         readonly List<Vector3> blinkScales = new List<Vector3>();
         readonly List<GameObject> shines = new List<GameObject>();
         GameObject mouthClosed, mouthOpen;
+        readonly List<GameObject> baseBrows = new List<GameObject>();
+        readonly GameObject[] moodBrows = new GameObject[6], moodMouths = new GameObject[6];
+        Renderer headRenderer;
+        int mood = 1;
         MeshFilter mittenL, mittenR;
         Vector3 handPose = RelaxedHand;
         int identity;
@@ -84,7 +88,7 @@ namespace TheElevator
 
             Transform neck = Group("Neck", pelvis, new Vector3(0,.40f,0));
             head = Group("Head", neck, Vector3.zero);
-            Part("Head", head, Sphere(), HeadCenter, HeadRadii * 2, look.Skin);
+            headRenderer = Part("Head", head, Sphere(), HeadCenter, HeadRadii * 2, look.Skin);
             BuildFace(look);
 
             // The plain avatar wears a short-sleeved tee: bare forearms.
@@ -238,10 +242,10 @@ namespace TheElevator
             {
                 Vector3 point = Surface(Direction(side * 16, 25), out Vector3 normal);
                 Quaternion facing = Quaternion.LookRotation(normal, Vector3.up);
-                if (style == 2) { Part("Eyebrow", head, Arc("Arched brow", .085f, .018f, .01f), point + normal * .008f, Vector3.one, FaceInk, facing, false); continue; }
+                if (style == 2) { baseBrows.Add(Part("Eyebrow", head, Arc("Arched brow", .085f, .018f, .01f), point + normal * .008f, Vector3.one, FaceInk, facing, false).gameObject); continue; }
                 float roll = style == 3 ? -side * 20 : style == 4 ? side * 22 : side * -6;
                 Vector3 size = style == 5 ? new Vector3(.105f,.038f,.022f) : new Vector3(.075f,.02f,.02f);
-                Part("Eyebrow", head, Sphere(), point + normal * .01f, size, FaceInk, facing * Quaternion.Euler(0, 0, roll), false);
+                baseBrows.Add(Part("Eyebrow", head, Sphere(), point + normal * .01f, size, FaceInk, facing * Quaternion.Euler(0, 0, roll), false).gameObject);
             }
         }
 
@@ -274,6 +278,57 @@ namespace TheElevator
             if (style == 5) return;
             Vector3 from = centers[0] + Vector3.right * ring, to = centers[1] - Vector3.right * ring;
             Part("Glasses bridge", head, Capsule(.05f,.008f,.008f), from, new Vector3(1, (to - from).magnitude / .05f, 1), frame, Quaternion.FromToRotation(Vector3.down, to - from), false);
+        }
+
+        // ---- Anger: 1 resting face, 2 annoyed, 3 irritated, 4 angry, 5 furious and red -----------------
+
+        static readonly float[] MoodSquint = { 1, 1, .85f, .72f, .6f, .5f };
+        static readonly float[] MoodFlush = { 0, 0, 0, .18f, .42f, .8f };
+        static readonly Color AngerRed = new Color(.95f,.2f,.16f);
+
+        public void SetMood(int level)
+        {
+            level = Mathf.Clamp(level, 1, 5);
+            if (level == mood || !head) return;
+            if (level > 1 && !moodBrows[level]) BuildMood(level);
+            for (int i = 2; i <= 5; i++) { if (moodBrows[i]) moodBrows[i].SetActive(i == level); if (moodMouths[i]) moodMouths[i].SetActive(i == level); }
+            foreach (GameObject brow in baseBrows) brow.SetActive(level == 1);
+            headRenderer.sharedMaterial = Paint(Color.Lerp(Look.Skin, AngerRed, MoodFlush[level]));
+            mood = level;
+        }
+
+        void BuildMood(int level)
+        {
+            Transform brows = Group("Anger " + level + " brows", head, Vector3.zero);
+            float tilt = 2 + level * 8, thickness = .016f + level * .005f, width = .07f + level * .007f;
+            for (int side = -1; side <= 1; side += 2)
+            {
+                Vector3 point = Surface(Direction(side * 15, 25 - level), out Vector3 normal);
+                // Inner ends dip toward the nose as anger rises.
+                Part("Angry brow", brows, Sphere(), point + normal * .012f, new Vector3(width, thickness, .022f), FaceInk,
+                    Quaternion.LookRotation(normal, Vector3.up) * Quaternion.Euler(0, 0, side * tilt), false);
+            }
+            moodBrows[level] = brows.gameObject;
+            if (level == 5)
+            {
+                // A throbbing anger mark on the temple.
+                Vector3 temple = Surface(Direction(34, 36), out Vector3 templeNormal);
+                Quaternion facing = Quaternion.LookRotation(templeNormal, Vector3.up);
+                for (int i = 0; i < 4; i++)
+                    Part("Anger mark", brows, Capsule(.035f, .008f, .008f), temple + templeNormal * .01f + facing * new Vector3((i % 2 == 0 ? -1 : 1) * .018f, (i < 2 ? 1 : -1) * .018f, 0), Vector3.one,
+                        new Color(.55f,.04f,.05f), facing * Quaternion.Euler(0, 0, 45 + i * 90), false);
+            }
+            if (level == 5)
+            {
+                Transform shout = Group("Anger 5 mouth", head, Vector3.zero);
+                Vector3 point = Surface(Direction(0, -16), out Vector3 normal);
+                Quaternion facing = Quaternion.LookRotation(normal, Vector3.up);
+                Part("Shouting mouth", shout, Sphere(), point + normal * .004f, new Vector3(.12f,.08f,.02f), FaceInk, facing, false);
+                Part("Gritted teeth", shout, Sphere(), point + normal * .012f + facing * new Vector3(0, .022f, 0), new Vector3(.085f,.02f,.01f), Color.white, facing, false);
+                moodMouths[level] = shout.gameObject;
+            }
+            else moodMouths[level] = Part("Anger " + level + " mouth", head, Smile(level == 2 ? 9 : level == 3 ? 10 : 11, level == 2 ? 0 : level == 3 ? -3.5f : -6.5f, 0),
+                Vector3.zero, Vector3.one, FaceInk, Quaternion.identity, false).gameObject;
         }
 
         GameObject Feature(string name, float pitch, Vector3 size)
@@ -336,10 +391,14 @@ namespace TheElevator
             head.localRotation = Quaternion.Euler(-lean * .5f, -twist * .8f, 0) * gaze * Quaternion.Euler(bob.x + Mathf.Sin(phase * 2) * walk * 1.5f, 0, bob.y + breathe * .6f);
 
             float blink = (clock + identity * .71f) % 4.3f < .11f ? .12f : 1;
-            for (int i = 0; i < blinkers.Count; i++) { Vector3 scale = blinkScales[i]; blinkers[i].localScale = new Vector3(scale.x, scale.y * blink, scale.z); }
+            float squint = MoodSquint[mood];
+            for (int i = 0; i < blinkers.Count; i++) { Vector3 scale = blinkScales[i]; blinkers[i].localScale = new Vector3(scale.x, scale.y * blink * squint, scale.z); }
             foreach (GameObject shine in shines) shine.SetActive(blink == 1);
-            bool open = talking && Mathf.Sin(clock * 17 + identity) > 0;
-            mouthClosed.SetActive(!open); mouthOpen.SetActive(open);
+            bool open = pose.Talking && pace < .15f && Mathf.Sin(clock * 17 + identity) > 0;
+            mouthClosed.SetActive(!open && mood == 1); mouthOpen.SetActive(open);
+            if (moodMouths[mood]) moodMouths[mood].SetActive(!open);
+            // Fury shakes the head.
+            if (mood == 5) head.localRotation *= Quaternion.Euler(0, Mathf.Sin(clock * 38) * 2.5f, Mathf.Sin(clock * 31) * 1.5f);
         }
 
         // swing: +1 leg back, -1 leg forward. The knee folds while the leg travels forward; the toe rolls off behind.

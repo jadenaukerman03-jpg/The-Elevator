@@ -62,13 +62,17 @@ namespace TheElevator.Editor
                 {
                     if(game.Phase==DescentGame.RunPhase.Generating)return;
                     int room=office.Plan.MeetingRoom;Check(room>=0,"Meeting spawned");
-                    var participants=office.Employees.FindAll(e=>e.HomeRoom==room);Check(participants.Count>=3,"Meeting has a group");
-                    var door=office.Doors.Find(d=>d.RoomA==room||d.RoomB==room);Check(door,"Meeting door exists");
-                    game.Player.Teleport(door.transform.position-door.transform.forward*1.7f);
-                    door.Use();Check(participants.TrueForAll(e=>e.Suspicion>=14),"Opening meeting door alerts attendees");Check(office.SuspicionLevel>=14,"Meeting interruption reaches meter");
-                    float prior=participants[0].Suspicion;door.Use();door.Use();Check(participants[0].Suspicion==prior,"Door spam does not repeatedly farm suspicion");
+                    var participants=office.Employees.FindAll(e=>e.HomeRoom==room);Check(participants.Count>=8,"Meeting table is mostly full");
+                    Check(participants.Exists(e=>e.Station&&e.Station.Activity==OfficeTask.Present),"Presenter stands at the board");
+                    Check(office.Doors.FindAll(d=>d.RoomA==room||d.RoomB==room).Count==1,"Meeting room has exactly one door");
+                    Check(participants.TrueForAll(e=>e.AngerLevel==1),"Everyone starts calm");
+                    game.Player.Teleport(office.Map.Center(office.Map.Manifest.Rooms[room]));office.CheckMeetingEntry(0);
+                    Check(participants.TrueForAll(e=>e.Suspicion>=14&&e.AngerLevel>=2),"Walking into the meeting angers every attendee");
+                    float prior=participants[0].Suspicion;office.CheckMeetingEntry(0);game.Player.Teleport(new Vector3(0,.08f,-6.5f));office.CheckMeetingEntry(0);
+                    game.Player.Teleport(office.Map.Center(office.Map.Manifest.Rooms[room]));office.CheckMeetingEntry(0);
+                    Check(participants[0].Suspicion==prior,"Stepping in and out does not farm anger");
                     var subject=participants[0];OfficeTools.Capture(office.transform,"TestResults/Office/synthetic-face.png",subject.Robot.Head.position+subject.transform.forward*.52f+subject.transform.right*.18f+Vector3.up*.15f,subject.Robot.Head.position+Vector3.up*.15f);
-                    Finish(true,"OFFICE INTERACTION PASS: visible first-person hands, multiple grip profiles, selected equipment only, nearby pickup, gentle tap, capped charged throw, weight scaling, charge cancellation, real meeting group and door interruption with cooldown.");
+                    Finish(true,"OFFICE INTERACTION PASS: visible first-person hands, multiple grip profiles, selected equipment only, nearby pickup, gentle tap, capped charged throw, weight scaling, charge cancellation, two-room meeting with presenter, entry anger with cooldown.");
                 }
             }
             catch(Exception error){Finish(false,error.ToString());}

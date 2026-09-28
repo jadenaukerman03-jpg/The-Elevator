@@ -28,14 +28,18 @@ namespace TheElevator.Office
             A.W.Soft.Ring(clock,"Plum clock rim",Vector3.zero,.59f,.055f,A.W.Soft.Plum);
             A.Box(clock,"Minute hand",new Vector3(.1f,.12f,-.075f),new Vector3(.075f,.45f,.035f),A.Red).transform.localRotation=Quaternion.Euler(0,0,-32);
             A.Box(clock,"Hour hand",new Vector3(-.11f,0,-.09f),new Vector3(.30f,.085f,.04f),A.Dark);
-            for(int mark=0;mark<4;mark++){float angle=mark*Mathf.PI*.5f;A.Round(clock,"Clock marker",new Vector3(Mathf.Cos(angle)*.47f,Mathf.Sin(angle)*.47f,-.07f),new Vector3(.075f,.075f,.025f),A.Brass,PrimitiveType.Sphere);}            A.Label(root,"M / "+OfficePlan.Departments[info.Department]+"\n"+info.Kind.ToString().ToUpper()+"  "+room.Id.ToString("000"),new Vector3(3.2f,1.52f,-5.67f),.031f,null,180);
+            for(int mark=0;mark<4;mark++){float angle=mark*Mathf.PI*.5f;A.Round(clock,"Clock marker",new Vector3(Mathf.Cos(angle)*.47f,Mathf.Sin(angle)*.47f,-.07f),new Vector3(.075f,.075f,.025f),A.Brass,PrimitiveType.Sphere);}            if(room.Id!=Plan.MeetingRoom)
+            {
+                A.Box(root,"Department plaque",new Vector3(3.2f,2.35f,-5.76f),new Vector3(1.55f,.42f,.05f),A.Dark);
+                A.Label(root,"M / "+OfficePlan.Departments[info.Department]+"\n"+info.Kind.ToString().ToUpper()+"  "+room.Id.ToString("000"),new Vector3(3.2f,2.35f,-5.73f),.031f,null,180);
+            }
             // Slim safety equipment on the perimeter; never in the central transit cross.
             Transform safety=A.Group(root,"Safety station",new Vector3(-5.55f,0,-4.9f),90);
-            A.Box(safety,"Fire equipment backing",new Vector3(0,1.05f,0),new Vector3(.43f,.9f,.055f),A.Dark);
+            A.Box(safety,"Fire equipment backing",new Vector3(0,1.2f,0),new Vector3(.5f,1.2f,.055f),A.Dark);
             A.Round(safety,"Extinguisher tank",new Vector3(0,.95f,-.15f),new Vector3(.24f,.26f,.24f),A.Red);
             A.Box(safety,"Extinguisher grip",new Vector3(0,1.28f,-.15f),new Vector3(.2f,.05f,.07f),A.Metal);
             A.Box(safety,"Extinguisher hose",new Vector3(.14f,1.06f,-.15f),new Vector3(.035f,.39f,.035f),A.Dark);
-            A.Label(safety,"FIRE\nAND OTHER FEELINGS",new Vector3(0,1.64f,-.07f),.021f);
+            A.Label(safety,"FIRE\nAND OTHER FEELINGS",new Vector3(0,1.64f,-.035f),.021f);
             if(info.Kind==OfficeRoomKind.Lobby||info.Kind==OfficeRoomKind.Reception)
             {
                 Transform brand=A.Group(root,"Corporate architectural emblem",new Vector3(-4.15f,2.92f,-5.65f),180);

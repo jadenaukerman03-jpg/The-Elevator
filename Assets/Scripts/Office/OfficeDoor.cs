@@ -19,7 +19,6 @@ namespace TheElevator.Office
             {Office.Game.Sound.Play(120,.16f,.13f);Office.Game.Notify("ACCESS DENIED / supervisor keycard required.");Office.ReportAction(Office.Game.Player.transform.position,4,null);return;}
             Unlocked=true;RequestedOpen=!RequestedOpen;
             Office.Game.Sound.Play(760,.12f,.09f);
-            if(RequestedOpen)Office.InterruptMeeting(RoomA,RoomB);
         }
         public bool RequestPass(OfficeEmployee employee)
         {

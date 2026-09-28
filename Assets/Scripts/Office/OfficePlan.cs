@@ -7,7 +7,7 @@ namespace TheElevator.Office
 {
     public enum OfficeRoomKind { Lobby, Reception, Workroom, Conference, Breakroom, Records, Server, Security, Executive, Mailroom, Maintenance, Training, Restroom, Gallery }
     public enum OfficeQuality { Low, Medium, High, Ultra }
-    public enum OfficeTask { Reception, Typing, Reading, Coffee, Filing, Meeting, Repair, Patrol }
+    public enum OfficeTask { Reception, Typing, Reading, Coffee, Filing, Meeting, Repair, Patrol, Present }
     [Serializable] public sealed class OfficeConfig
     {
         public int Version = 1;
@@ -31,7 +31,7 @@ namespace TheElevator.Office
         public OfficeConfig Config;
         public List<OfficeRoomPlan> Rooms = new List<OfficeRoomPlan>();
         public int TargetRoom, SupervisorRoom, TargetType;
-        public int MeetingRoom=-1;
+        public int MeetingRoom=-1, MeetingAnnexSide=-1;
         public bool DeskBadge;
         public string Hash;
         public List<int> ExtractionRoute;
@@ -84,10 +84,7 @@ namespace TheElevator.Office
             }
             plan.DeskBadge=(unchecked((uint)map.Recipe.Seed)%2)==0;
             List<OfficeRoomPlan> eventRooms=plan.Rooms.FindAll(r=>r.RoomId>2&&r.RoomId!=plan.TargetRoom&&!map.Rooms[r.RoomId].IsStair&&map.Rooms[r.RoomId].Layer==0);
-            if(eventRooms.Count>0&&random.Range(100)<55)
-            {
-                OfficeRoomPlan meeting=eventRooms[random.Range(eventRooms.Count)];meeting.Kind=OfficeRoomKind.Conference;plan.MeetingRoom=meeting.RoomId;
-            }
+            ChooseMeetingRoom(map,plan,eventRooms,random);
             if(!plan.Rooms.Exists(r=>r.Kind==OfficeRoomKind.Breakroom&&r.RoomId!=plan.TargetRoom))
             {
                 OfficeRoomPlan coffee=eventRooms.Find(r=>r.RoomId!=plan.MeetingRoom);
@@ -103,6 +100,32 @@ namespace TheElevator.Office
             if (!reachable.Contains(plan.SupervisorRoom)) throw new InvalidOperationException("Credential is locked behind its own door.");
             plan.Hash = StableHash.Of(map.StructureHash + "|office-v2-social|" + JsonUtility.ToJson(plan));
             return plan;
+        }
+
+        // Port directions shared with the geometry builder: 0 +Z, 1 +X, 2 -Z, 3 -X.
+        public static readonly int[] PortX = { 0, 1, 0, -1 }, PortZ = { 1, 0, -1, 0 };
+
+        // The meeting room is a dead end you only reach by accident: one door, and a second, empty grid cell beyond it
+        // so the room runs two rooms long, away from its door when possible.
+        static void ChooseMeetingRoom(MapManifest map,OfficePlan plan,List<OfficeRoomPlan> candidates,MapRandom random)
+        {
+            List<int> order=new List<int>();foreach(OfficeRoomPlan r in candidates)order.Add(r.RoomId);
+            for(int i=order.Count-1;i>0;i--){int j=random.Range(i+1);int swap=order[i];order[i]=order[j];order[j]=swap;}
+            foreach(int id in order)
+            {
+                MapRoom room=map.Rooms[id];
+                List<int> neighbors=map.Neighbors(id);
+                if(neighbors.Count!=1)continue;
+                MapRoom door=map.Rooms[neighbors[0]];
+                int doorSide=door.X>room.X?1:door.X<room.X?3:door.Z>room.Z?0:2;
+                foreach(int side in new[]{(doorSide+2)%4,(doorSide+1)%4,(doorSide+3)%4})
+                {
+                    int x=room.X+PortX[side],z=room.Z+PortZ[side];
+                    if(z<0||map.Rooms.Exists(r=>r.X==x&&r.Z==z))continue;
+                    plan.MeetingRoom=id;plan.MeetingAnnexSide=side;plan.Rooms[id].Kind=OfficeRoomKind.Conference;
+                    return;
+                }
+            }
         }
     }
 }

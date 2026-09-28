@@ -13,7 +13,7 @@ namespace TheElevator
         [SerializeField] bool infiniteStamina = true;
         float stamina = 1f;
         public float Stamina { get { return infiniteStamina ? 1f : stamina; } private set { stamina = value; } }
-        public int Health { get; private set; } = 3;
+
         public bool InCabin { get { return DescentGame.InCabin(transform.position); } }
         public string Prompt { get; private set; }
         public bool MovingFast { get; private set; }
@@ -222,21 +222,21 @@ namespace TheElevator
             Destroy(consumed);
         }
 
-        public void Hurt(Vector3 source)
+        public void Knock(Vector3 source)
         {
             if (damageCooldown > 0 || !game.ControlsActive) return;
             damageCooldown = 2;
-            Health--;
+
             Vector3 away = transform.position - source;
             away.y = 0;
             knockback = away.normalized * 8;
             Drop(true);
             game.Sound.Play(65, 0.25f, 0.18f);
-            game.Notify("Workplace incident. Return to the lift!");
-            if (Health <= 0) game.Finish(false, "Three workplace incidents. Your shift has been terminated.");
+            game.Notify("Ow. Watch where you're going.");
+
         }
 
-        public void Recover() { Health = Mathf.Min(3, Health + 1); Stamina = 1; }
+        public void Recover() { Stamina = 1; }
 
         void OnGUI()
         {

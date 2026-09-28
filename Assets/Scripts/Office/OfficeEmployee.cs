@@ -13,6 +13,8 @@ namespace TheElevator.Office
         public Vector3 LastObservedPosition;
         public float Suspicion,PickpocketProgress;
         public float Threshold { get { return Supervisor?55:72; } }
+        // Anger shown on the face: 1 calm, 5 furious. It follows this employee's own suspicion of the player.
+        public int AngerLevel { get { return Suspicion<10?1:Suspicion<30?2:Suspicion<50?3:Suspicion<75?4:5; } }
         public bool AtStation { get { return Station && Vector3.Distance(transform.position,Station.transform.position)<.35f; } }
         public bool Travelling { get { return route.Count>0; } }
         public OfficeCoffeeCup Cup { get; private set; }
@@ -45,7 +47,8 @@ namespace TheElevator.Office
             foreach(OfficeEmployee other in office.Employees)if(other.Motor)Physics.IgnoreCollision(motor,other.Motor);
             Transform visual=office.Kit.A.Group(transform,"Synthetic employee",Vector3.zero);
             BeanOutfit outfit=IsSecurity?BeanOutfit.Security:supervisor?BeanOutfit.Office:station.Activity==OfficeTask.Reception?BeanOutfit.Reception:station.Activity==OfficeTask.Repair?BeanOutfit.Technician:station.Activity==OfficeTask.Filing?BeanOutfit.Clerk:BeanOutfit.Office;
-            Robot=visual.gameObject.AddComponent<BusinessRobot>();Robot.Build(office.Kit.A,id,supervisor||IsSecurity,outfit);Robot.Activity=station.Activity;Robot.Seated=station.Seated;
+            Robot=visual.gameObject.AddComponent<BusinessRobot>();Robot.Build(office.Kit.A,id,supervisor||IsSecurity,outfit);
+            if(station.Activity==OfficeTask.Present){Job="Quarterly presenter";Robot.HoldPointer();}Robot.Activity=station.Activity;Robot.Seated=station.Seated;
             renderers=GetComponentsInChildren<Renderer>();nextTask=Time.time+18+id*3.17f+(float)random.NextDouble()*65;previous=transform.position;
         }
         public bool CanPickpocket(Transform player)
@@ -74,6 +77,13 @@ namespace TheElevator.Office
         {
             Suspicion=Mathf.Clamp(Suspicion+amount,0,100);attentionUntil=Time.time+7;
             if(Office.Game){LastObservedPosition=Office.Game.Player.transform.position;Robot.LookTarget=LastObservedPosition+Vector3.up*(Office.Game.Player.Crouched?WorkerController.CrouchEyeHeight:WorkerController.EyeHeight);Office.Questioner=this;Office.Game.Notify(Job+": "+reason);}
+        }
+        // Staring at the intruder while they stay in the room; anger keeps climbing.
+        public void Glare(float anger)
+        {
+            if(!Office.Game)return;
+            attentionUntil=Mathf.Max(attentionUntil,Time.time+1.5f);
+            Suspicion=Mathf.Clamp(Suspicion+anger,0,100);
         }
         void Update()
         {
@@ -106,10 +116,10 @@ namespace TheElevator.Office
                 {
                     nextDispatch=Time.time+12;
                     int room=Office.Map.NearestRoom(Office.LastReportedPosition).Id;
-                    OfficeTaskPoint investigate=Office.Stations.Find(s=>s.RoomId==room&&s.Available);
+                    OfficeTaskPoint investigate=Office.Stations.Find(s=>s.RoomId==room&&s.Available&&s.Activity!=OfficeTask.Meeting&&s.Activity!=OfficeTask.Present);
                     if(investigate)TryTravel(investigate);
                 }
-                if(IsSecurity&&Office.Alarm&&distance<1.25f&&Sees(Office.Game.Player.transform.position))Office.Game.Player.Hurt(transform.position);
+                if(IsSecurity&&Office.Alarm&&distance<1.25f&&Sees(Office.Game.Player.transform.position))Office.Game.Player.Knock(transform.position);
                 if(!Travelling&&CoffeeStage<0&&Time.time>nextTask&&Suspicion<40&&!Supervisor&&HomeRoom!=Office.Plan.MeetingRoom&&HomeStation.Activity!=OfficeTask.Reception)ChooseTask();
             }
             // A started trip always completes, even when the player leaves: no frozen doorway occupants.
@@ -129,6 +139,8 @@ namespace TheElevator.Office
             }
             else Robot.LookTarget=Vector3.zero;
             Robot.Talking=Office.IsMeetingSpeaker(this);
+            if(Robot.Activity==OfficeTask.Present)Robot.PointAt=Office.BoardPoint(Time.time);
+            Robot.Mood=AngerLevel;
             Robot.Speed=Vector3.Distance(transform.position,previous)/Mathf.Max(.001f,Time.deltaTime);previous=transform.position;
             if(Cup&&CoffeeStage<0){Cup.transform.position=transform.position+transform.forward*.36f+transform.right*.23f+Vector3.up*1.10f;Cup.transform.rotation=Quaternion.identity;Robot.Reaching=true;Robot.ReachTarget=Cup.transform.position+Vector3.up*.07f;}
             Robot.Animate(Time.deltaTime);

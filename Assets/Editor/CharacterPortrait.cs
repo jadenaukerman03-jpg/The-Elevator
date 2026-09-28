@@ -35,6 +35,15 @@ namespace TheElevator.Editor
                     staff.Build(art,i*3+1,i==jobs.Length-1,jobs[i]);staff.Activity=OfficeTask.Reading;staff.Animate(1);
                 }
                 Capture(root,"TestResults/Character/staff.png",Distance(jobs.Length,1.05f),false);
+                UnityEngine.Object.DestroyImmediate(holder.gameObject);
+                // Anger levels 1 to 5 on the same employee.
+                holder=new GameObject("Anger").transform;holder.SetParent(root.transform);
+                for(int level=1;level<=5;level++)
+                {
+                    var staff=new GameObject("Anger "+level).AddComponent<BusinessRobot>();staff.transform.SetParent(holder);Place(staff.transform,level-1,5,.95f);
+                    staff.Build(art,7,false,BeanOutfit.Office);staff.Activity=OfficeTask.Reading;staff.Mood=level;staff.Animate(1);
+                }
+                Capture(root,"TestResults/Character/anger.png",5*.95f*.5f/.6f+.5f,true);
                 Debug.Log("CHARACTER PORTRAIT PASS: avatar presets, wardrobe sheets and "+jobs.Length+" office staff rendered.");
             }
             finally{UnityEngine.Object.DestroyImmediate(root);workshop.Dispose();}

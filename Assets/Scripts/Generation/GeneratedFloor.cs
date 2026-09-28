@@ -37,8 +37,16 @@ namespace TheElevator.Generation
                 float score = delta.x * delta.x + delta.z * delta.z + delta.y * delta.y * 16;
                 if (score < distance) { distance = score; best = room; }
             }
+            foreach (KeyValuePair<int, Vector3> extension in Extensions)
+            {
+                Vector3 delta = position - extension.Value;
+                float score = delta.x * delta.x + delta.z * delta.z + delta.y * delta.y * 16;
+                if (score < distance) { distance = score; best = Manifest.Rooms[extension.Key]; }
+            }
             return best;
         }
+        // Extra cell centers that belong to an existing room (a room built two cells long).
+        public readonly List<KeyValuePair<int, Vector3>> Extensions = new List<KeyValuePair<int, Vector3>>();
         public bool IsWet(Vector3 position)
         {
             MapRoom room = NearestRoom(position);

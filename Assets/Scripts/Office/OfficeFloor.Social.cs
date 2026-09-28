@@ -43,12 +43,12 @@ namespace TheElevator.Office
             foreach(OfficeRoomPlan room in Plan.Rooms)
             {
                 if(room.RoomId<=1||room.RoomId==Plan.TargetRoom||room.Kind==OfficeRoomKind.Breakroom||room.Kind==OfficeRoomKind.Gallery||room.Kind==OfficeRoomKind.Restroom)continue;
-                int capacity=room.RoomId==Plan.MeetingRoom?6:room.Kind==OfficeRoomKind.Workroom?Math.Min(2,Plan.Config.EmployeesPerRoom):1;
+                if(room.RoomId==Plan.MeetingRoom){PopulateMeeting();continue;}
+                int capacity=room.Kind==OfficeRoomKind.Workroom?Math.Min(2,Plan.Config.EmployeesPerRoom):1;
                 foreach(OfficeTaskPoint task in Stations)
                 {
                     if(capacity<=0||Employees.Count>=Plan.Config.PopulationCap)break;
                     if(task.RoomId!=room.RoomId||task.Occupant||task.Activity==OfficeTask.Coffee)continue;
-                    if(room.RoomId==Plan.MeetingRoom&&task.Activity!=OfficeTask.Meeting)continue;
                     SpawnEmployee(task,false);capacity--;
                 }
             }
@@ -92,11 +92,38 @@ namespace TheElevator.Office
             ReportAction(Game.Player.transform.position,22,disturbed?owner:null);
             if(disturbed){owner.React(62,"I was using that computer. Put it back.");cargo.Workstation.Equipment=null;cargo.Workstation.EquipmentMissing=true;}
         }
-        public bool IsMeetingSpeaker(OfficeEmployee employee)
+        // The presenter always stands; roughly three of every four chairs around the table are taken.
+        void PopulateMeeting()
         {
-            if(Plan.MeetingRoom<0||!employee.AtStation||employee.HomeRoom!=Plan.MeetingRoom)return false;
-            var attendees=Employees.FindAll(e=>e.AtStation&&e.HomeRoom==Plan.MeetingRoom);
-            return attendees.Count>0&&attendees[(int)(Time.time/5)%attendees.Count]==employee;
+            int seat=0;
+            foreach(OfficeTaskPoint task in Stations)
+            {
+                if(task.RoomId!=Plan.MeetingRoom||task.Occupant||Employees.Count>=Plan.Config.PopulationCap)continue;
+                if(task.Activity==OfficeTask.Present){SpawnEmployee(task,false);continue;}
+                if(task.Activity==OfficeTask.Meeting&&seat++%4!=3)SpawnEmployee(task,false);
+            }
+        }
+        public bool IsMeetingSpeaker(OfficeEmployee employee)
+        { return employee.AtStation&&employee.Station.Activity==OfficeTask.Present; }
+        // The presenter's stick moves from chart bar to chart bar, pausing on each.
+        public Vector3 BoardPoint(float time)
+        {
+            if(!Kit.MeetingBoard)return Vector3.zero;
+            float step=time/2.4f;int bar=(int)step%6,next=(bar+1)%6;float blend=Mathf.SmoothStep(0,1,Mathf.Clamp01((step-(int)step-.7f)/.3f));
+            Vector3 a=new Vector3(-1.4f+bar*.56f,1.05f+.25f+bar*.2f,-.06f),b=new Vector3(-1.4f+next*.56f,1.05f+.25f+next*.2f,-.06f);
+            return Kit.MeetingBoard.TransformPoint(Vector3.Lerp(a,b,blend));
+        }
+        bool playerInMeeting;
+        // Walking into the meeting turns every head, and each attendee gets angrier the longer you stay.
+        public void CheckMeetingEntry(float dt)
+        {
+            if(Plan.MeetingRoom<0||!Game)return;
+            bool inside=Map.NearestRoom(Game.Player.transform.position).Id==Plan.MeetingRoom;
+            if(inside&&!playerInMeeting)InterruptMeeting();
+            playerInMeeting=inside;
+            if(!inside)return;
+            foreach(OfficeEmployee employee in Employees)
+                if(employee.HomeRoom==Plan.MeetingRoom&&!employee.Travelling)employee.Glare(dt*2.5f);
         }
         public string MeetingLine
         {
@@ -106,12 +133,12 @@ namespace TheElevator.Office
                 return lines[(int)(Time.time/5)%lines.Length];
             }
         }
-        public void InterruptMeeting(int roomA,int roomB)
+        void InterruptMeeting()
         {
-            int room=Plan.MeetingRoom;if(room<0||(roomA!=room&&roomB!=room))return;
+            int room=Plan.MeetingRoom;
             if(meetingCooldown.TryGetValue(room,out float until)&&Time.time<until)return;
             int count=0;foreach(OfficeEmployee employee in Employees)
-                if(employee.Station&&employee.Station.RoomId==room&&!employee.Travelling){employee.React(14,"This meeting is private. Can we help you?");count++;}
+                if(employee.Station&&employee.Station.RoomId==room&&!employee.Travelling){employee.React(22,"This meeting is private. Can we help you?");count++;}
             if(count>0)meetingCooldown[room]=Time.time+20;
         }
         void AddRoomDoors()

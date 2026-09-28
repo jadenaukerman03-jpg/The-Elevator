@@ -117,7 +117,7 @@ namespace TheElevator
                 game.Load > RunRules.Capacity ? Workshop.Red : Workshop.Yellow);
             Text(new Rect(342, height - 75, 520, 23), "STAMINA", small);
             Bar(new Rect(342, height - 47, 180, 5), game.Player.Stamina, Workshop.Cream);
-            Text(new Rect(width - 267, height - 83, 245, 25), "INCIDENTS LEFT  " + game.Player.Health + " / 3", body);
+
             Text(new Rect(width - 267, height - 51, 245, 24), "L  LIGHT     ESC  PAUSE", small);
             if (game.Load > RunRules.Capacity)
                 Text(new Rect(342, bottom, 600, 27), "OVERLOADED  /  EXTRA POWER + SLOWER DOORS", body);

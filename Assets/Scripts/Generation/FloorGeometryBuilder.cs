@@ -86,8 +86,16 @@ namespace TheElevator.Generation
                 if (other.Layer == room.Layer) ports.Add(other.X > room.X ? 1 : other.X < room.X ? 3 : other.Z > room.Z ? 0 : 2);
             }
             if (room.Has(RoomRole.Entrance)) ports.Add(2);
+            int annex = office && office.Plan.MeetingRoom == room.Id ? office.Plan.MeetingAnnexSide : -1;
+            if (annex >= 0)
+            {
+                Annex(geometry, annex, height, wall, accent, deck);
+                float cell = settings.CellSizeMillimeters / 1000f;
+                floor.Extensions.Add(new KeyValuePair<int, Vector3>(room.Id, floor.Center(room) + floor.transform.TransformDirection(new Vector3(OfficePlan.PortX[annex], 0, OfficePlan.PortZ[annex])) * cell));
+            }
             for (int side = 0; side < 4; side++)
             {
+                if (side == annex) continue;
                 Transform segment = w.Group("Wall " + side, geometry, Vector3.zero);
                 segment.localRotation = Quaternion.Euler(0, side * 90, 0);
                 float opening = room.Has(RoomRole.Entrance) && side == 2 ? 5f : settings.DoorWidthMillimeters / 1000f;
@@ -113,7 +121,6 @@ namespace TheElevator.Generation
             {
                 w.Label("CIVIC WORKS / ARRIVALS", root, new Vector3(0,3.42f,5.78f), 0.065f, Workshop.Cream);
                 w.Label("FOLLOW YOUR TEAM.\nTHE BUILDING WILL NOT HELP.", root, new Vector3(-4,2.55f,5.78f), 0.03f, Workshop.Cream);
-                for (int z = -5; z <= 2; z += 2) Box(geometry, "Arrival guide", new Vector3(0,0.016f,z), new Vector3(0.10f,0.02f,0.8f), accent, false);
             }
             if (room.Has(RoomRole.Landmark) && !office)
                 w.Label(room.LandmarkName, root, new Vector3(0,3.35f,5.78f), 0.062f, accent);
@@ -126,6 +133,25 @@ namespace TheElevator.Generation
                 Box(geometry, "Service conduit", new Vector3(side * 4.5f,height - 0.45f,0), new Vector3(0.16f,0.16f,11.6f), accent, false);
             }
             CombineStaticMeshes(geometry);
+        }
+
+        // A room that runs two cells long: the neighbouring empty cell and the gap between them become one space.
+        void Annex(Transform geometry, int side, float height, Color wall, Color accent, Color deck)
+        {
+            float cell = settings.CellSizeMillimeters / 1000f, gap = cell - 12;
+            Transform annex = w.Group("Two-cell room extension", geometry, Vector3.zero);
+            annex.localRotation = Quaternion.Euler(0, side * 90, 0);
+            Box(annex, "Floor slab", new Vector3(0,-0.15f,cell / 2 + 6), new Vector3(12,0.3f,cell), deck);
+            Box(annex, "Ceiling", new Vector3(0,height + 0.10f,cell / 2 + 6.1f), new Vector3(12.2f,0.2f,cell), Workshop.Ink);
+            for (int sign = -1; sign <= 1; sign += 2)
+            {
+                Box(annex, "Wall", new Vector3(sign * 6,height / 2,6 + gap / 2), new Vector3(0.24f,height,gap + 0.24f), wall);
+                Transform far = w.Group("Wall " + (sign < 0 ? "extension left" : "extension right"), annex, new Vector3(0,0,cell));
+                far.localRotation = Quaternion.Euler(0, sign * 90, 0);
+                Wall(far, false, 0, height, wall, accent);
+            }
+            Transform end = w.Group("Wall extension end", annex, new Vector3(0,0,cell));
+            Wall(end, false, 0, height, wall, accent);
         }
 
         void Wall(Transform root, bool open, float opening, float height, Color wall, Color accent)
@@ -205,8 +231,6 @@ namespace TheElevator.Generation
             Box(root, "Connector ceiling", new Vector3(0,3.3f,0), new Vector3(width + 0.4f,0.2f,length), Workshop.Ink);
             for (int side = -1; side <= 1; side += 2)
                 Box(root, "Connector wall", new Vector3(side * (width / 2 + 0.1f),1.6f,0), new Vector3(0.2f,3.2f,length), Workshop.Steel);
-            if (link.Kind == LinkKind.Shortcut)
-                Box(root, "Shortcut threshold", new Vector3(0,0.015f,0), new Vector3(width,0.02f,0.18f), Workshop.Mint, false);
             if(office)office.Kit.DressConnector(root,length,width,link);
             CombineStaticMeshes(root);
         }
@@ -243,7 +267,8 @@ namespace TheElevator.Generation
             Box(geometry, "Half landing", new Vector3(0,2.85f,3.7f), new Vector3(6.4f,0.3f,1.4f), Workshop.Steel);
             Box(geometry, "Bottom landing", new Vector3(-2,-0.15f,-3.7f), new Vector3(2.4f,0.3f,1.4f), Workshop.Steel);
             Rail(geometry, new Vector3(0,3.55f,4.4f), new Vector3(6.4f,1.1f,0.10f));
-            w.Label("STAFF GALLERY\nUP ONE LEVEL", root, new Vector3(-3.8f,1.7f,-2.9f), 0.055f, accent);
+            Box(geometry, "Stair sign board", new Vector3(-5.86f,1.7f,-2.9f), new Vector3(0.06f,0.8f,1.6f), Workshop.Ink, false);
+            w.Label("STAFF GALLERY\nUP ONE LEVEL", root, new Vector3(-5.8f,1.7f,-2.9f), 0.055f, accent, -90);
         }
         void Flight(Transform root, Vector3 offset, bool reverse, Color accent)
         {

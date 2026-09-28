@@ -29,6 +29,14 @@ Office staff dress for their job: associate, receptionist (headset), technician 
 
 ![Office staff by job](Docs/ArtDirection/staff.png)
 
+### Anger and the boardroom
+
+There are no suspicion or incident meters. Every employee has their own anger, starting calm (1) and rising to furious (5) as you upset them; read it on their face: a resting face, then annoyed, irritated, angry, and finally red-faced and shouting. Anger cools slowly while they can't see you.
+
+Most floors hide a boardroom: a dead-end room two rooms long with one door, a long table ringed by mostly occupied chairs, and a presenter at the far end pointing a stick at the quarterly chart. Walk in and every head turns, and everyone's anger rises the longer you stay.
+
+![Anger levels 1 to 5](Docs/ArtDirection/anger.png)
+
 To create the Windows game after cloning, open the project in Unity and choose **The Elevator > Build Windows Player**. Run `PLAY THE ELEVATOR.cmd` after the build completes. The executable is generated at `Builds/Windows/TheElevator.exe`. Build output, Unity caches and temporary validation results are intentionally excluded from Git; the source assets, scenes, packages, project settings, tests and tools needed to rebuild are included.
 
 ## Map sizes
@@ -44,11 +52,11 @@ These are configurable targets, not measured session lengths. Standard is intend
 
 ## Your shift
 
-Three stops share the original power, cargo, weight and health rules. Bring cargo behind the yellow threshold. The 180 kg limit includes your 70 kg worker; overload increases power consumption and door-closing time. The lift starts with 68 power and normal departure costs 24, so connect at least one cell during a complete shift.
+Three stops share the original power, cargo and weight rules. Bring cargo all the way inside the elevator. The 180 kg limit includes your 70 kg worker; overload increases power consumption and door-closing time. The lift starts with 68 power and normal departure costs 24, so connect at least one cell during a complete shift.
 
-Remote survey consoles provide distant exploration targets. Completion is tracked per floor; it currently neither gates departure nor awards an economy bonus. Records offices, wet utilities, sorting rooms, break areas, landmarks and stair galleries populate the facility. Custodians and electrical plates occupy deeper regions. The lift is safe; the timer can leave you behind.
+Remote survey consoles provide distant exploration targets. Completion is tracked per floor; it currently neither gates departure nor awards an economy bonus. Records offices, wet utilities, sorting rooms, break areas, landmarks and stair galleries populate the facility. Custodians patrol deeper regions and knock you back if they catch you. The lift is safe; the timer can leave you behind.
 
-Cargo recovered in the cabin persists between floors. Three incidents end the run. Pause and loss of focus stop simulation. Disabling **Use Procedural Floors** retains the original three compact layouts and 110-second timers.
+Cargo recovered in the cabin persists between floors. Pause and loss of focus stop simulation. Disabling **Use Procedural Floors** retains the original three compact layouts and 110-second timers.
 
 ## Controls
 

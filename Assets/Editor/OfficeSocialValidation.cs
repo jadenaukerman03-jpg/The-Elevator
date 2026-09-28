@@ -90,13 +90,21 @@ namespace TheElevator.Editor
                     if(traveller.Cup&&traveller.CoffeeStage<0&&traveller.Station==traveller.HomeStation&&!traveller.Travelling)
                     {
                         Check(traveller.Cup.Fill>0,"Employee carries remaining drink home");
-                        bool meeting=false,noMeeting=false,desk=false,person=false;
+                        int meetings=0;bool desk=false,person=false;
                         for(int seed=100;seed<130;seed++)
                         {
-                            OfficePlan plan=OfficePlan.Build(new MacroLayoutGenerator().Generate(OfficeTools.Recipe(seed,MapSize.Small)));
-                            meeting|=plan.MeetingRoom>=0;noMeeting|=plan.MeetingRoom<0;desk|=plan.DeskBadge;person|=!plan.DeskBadge;
+                            var map=new MacroLayoutGenerator().Generate(OfficeTools.Recipe(seed,MapSize.Small));
+                            OfficePlan plan=OfficePlan.Build(map);
+                            if(plan.MeetingRoom>=0)
+                            {
+                                meetings++;
+                                Check(map.Neighbors(plan.MeetingRoom).Count==1,"Meeting room is a dead end with one door");
+                                var room=map.Rooms[plan.MeetingRoom];int ax=room.X+OfficePlan.PortX[plan.MeetingAnnexSide],az=room.Z+OfficePlan.PortZ[plan.MeetingAnnexSide];
+                                Check(!map.Rooms.Exists(r=>r.X==ax&&r.Z==az),"Meeting room extension occupies an empty cell");
+                            }
+                            desk|=plan.DeskBadge;person|=!plan.DeskBadge;
                         }
-                        Check(meeting&&noMeeting,"Meeting chance varies by seed");Check(desk&&person,"Desk and person badge variants exist");
+                        Check(meetings>=20,"Most floors have a two-room meeting room");Check(desk&&person,"Desk and person badge variants exist");
                         game.Player.Teleport(new Vector3(0,.08f,-6.5f));game.RegenerateMap(104728,MapSize.Small,false);stage=3;return;
                     }
                     Check(Time.time-started<160,"Coffee employee did not return home / "+traveller.State);

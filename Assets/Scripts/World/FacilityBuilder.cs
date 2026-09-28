@@ -32,13 +32,6 @@ namespace TheElevator
                 new Vector3(2.5f, 2.8f, 0.25f), Workshop.Steel).transform;
             RightDoor = w.Shape("Right door", root, new Vector3(1.25f, 1.4f, -2),
                 new Vector3(2.5f, 2.8f, 0.25f), Workshop.Steel).transform;
-            for (int i = 0; i < 12; i++)
-            {
-                Box("Hazard stripe", root, -4.1f + i * 0.75f, 0.015f, -2.35f, 0.36f, 0.02f, 0.38f,
-                    i % 2 == 0 ? Workshop.Yellow : Workshop.Ink);
-                Box("Deck seam", root, -4.1f + i * 0.75f, 0.011f, -6.2f, 0.015f, 0.012f, 7,
-                    new Color(0.16f, 0.22f, 0.23f));
-            }
             Box("Floor indicator backing",root,0,3.24f,-2.23f,2.8f,.45f,.08f,Workshop.Ink);
             Display=w.Label("01",root,new Vector3(0,3.24f,-2.278f),.065f,Workshop.Mint);
             Transform cabin=w.Group("Passenger freight elevator fittings",root,Vector3.zero);
@@ -69,8 +62,6 @@ namespace TheElevator
             w.Label("B" + (index + 1).ToString("00") + " / " + Names[index], root,
                 new Vector3(0, 3.1f, 21.75f), 0.12f, Workshop.Cream);
             w.Label("LIFT / RETURN THIS WAY", root, new Vector3(0, 3.85f, -1.7f), 0.08f, Workshop.Yellow, 180);
-            for (int z = 1; z < 22; z += 3)
-                Box("Return guide stripe", root, 0, 0.013f, z, 0.12f, 0.02f, 1.1f, Workshop.Yellow);
             for (int z = 3; z <= 19; z += 8)
             {
                 Box("Ceiling crossbeam", root, 0, 4.3f, z, 24, 0.35f, 0.35f, Workshop.Ink);
@@ -135,12 +126,8 @@ namespace TheElevator
                     w.Shape("Tank lid", root, new Vector3(side * 10, 2.72f, z), new Vector3(1.9f, 0.08f, 1.9f),
                         Workshop.Mint, PrimitiveType.Cylinder);
                 }
-                Transform plate = w.Shape("Exposed electrical plate", root, new Vector3(side * 6, 0.15f, 11),
-                    new Vector3(3.8f, 0.12f, 3.2f), Workshop.Yellow, PrimitiveType.Cube, false).transform;
-                ElectricalHazard hazard = plate.gameObject.AddComponent<ElectricalHazard>();
-                hazard.Initialize(game, w, side > 0 ? 2.5f : 0);
             }
-            w.Label("LIVE CIRCUITS\nWAIT FOR GREEN", root, new Vector3(0, 2.3f, 21.7f), 0.095f, Workshop.Yellow);
+            w.Label("SPECIMENS\nDO NOT TAP THE GLASS", root, new Vector3(0, 2.3f, 21.7f), 0.095f, Workshop.Yellow);
         }
 
         void Office(Transform root)

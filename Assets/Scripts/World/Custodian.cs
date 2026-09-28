@@ -72,7 +72,7 @@ namespace TheElevator
             if (stuckTime > 0.6f) { destination += transform.right * 2.5f; stuckTime = 0; }
             head.localRotation = Quaternion.Euler(0, Mathf.Sin(Time.time * 2) * 8, Mathf.Sin(Time.time * 5) * 4);
             eye.intensity = alert > 0 ? 3 : 1;
-            if (toPlayer.magnitude < 1.25f && player.z > 0) game.Player.Hurt(transform.position);
+            if (toPlayer.magnitude < 1.25f && player.z > 0) game.Player.Knock(transform.position);
         }
 
         void UpdateGeneratedFloor()
@@ -112,32 +112,7 @@ namespace TheElevator
             if (delta.sqrMagnitude > 0.01f) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(delta), Time.deltaTime * 5);
             head.localRotation = Quaternion.Euler(0, Mathf.Sin(Time.time * 2) * 8, Mathf.Sin(Time.time * 5) * 4);
             eye.intensity = alert > 0 ? 3 : 1;
-            if (!game.Player.InCabin && toward.magnitude < 1.3f) game.Player.Hurt(transform.position);
-        }
-    }
-
-    public sealed class ElectricalHazard : MonoBehaviour
-    {
-        DescentGame game;
-        Renderer surface;
-        Material safe, danger;
-        float offset;
-        public void Initialize(DescentGame owner, Workshop workshop, float timingOffset)
-        {
-            game = owner;
-            surface = GetComponent<Renderer>();
-            safe = workshop.Mat(Workshop.Mint);
-            danger = workshop.Mat(Workshop.Red);
-            offset = timingOffset;
-        }
-        void Update()
-        {
-            if (!game || !game.ControlsActive) return;
-            bool live = (Time.time + offset) % 5f > 2.5f;
-            surface.sharedMaterial = live ? danger : safe;
-            Vector3 p = game.Player.transform.position - transform.position;
-            if (live && Mathf.Abs(p.x) < transform.localScale.x / 2 + 0.25f && Mathf.Abs(p.z) < transform.localScale.z / 2 + 0.25f && p.y > -0.4f && p.y < 0.45f)
-                game.Player.Hurt(transform.position);
+            if (!game.Player.InCabin && toward.magnitude < 1.3f) game.Player.Knock(transform.position);
         }
     }
 }
