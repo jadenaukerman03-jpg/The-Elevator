@@ -33,7 +33,7 @@ namespace TheElevator
         float eyeHeight=EyeHeight;
         DescentGame game;
         CharacterController motor;
-        float yaw, pitch = 17f, vertical, damageCooldown, lastStep;
+        float yaw, pitch = 0f, vertical, damageCooldown, lastStep;
         bool firstPerson = true;
         ObjectiveTerminal terminal;
         Light flashlight;
