@@ -8,17 +8,11 @@ namespace TheElevator.Office
         public readonly Workshop W;
         public Material Plaster, Carpet, Tile, Wood, Metal, Dark, Plastic, Paper, Upholstery, Screen, WarmLight, CoolLight, Glass, Brass, Red;
         public Material[] DepartmentAccents;
-        public Material Skin, HeadSkin, Lips, Eyes, Iris;
         public int Pieces;
         static Mesh rounded;
         public OfficeArt(Workshop workshop)
         {
             W=workshop;
-            Skin=Mat("Pale synthetic dermis",new Color(.69f,.65f,.54f),0,.24f,.025f);
-            HeadSkin=W.Own(new Material(Skin));HeadSkin.name="Continuous face dermis";HeadSkin.SetFloat("_VertexTint",1);
-            Lips=Mat("Muted synthetic lips",new Color(.43f,.33f,.28f),0,.18f,.015f);
-            Eyes=Mat("Ivory sclera",new Color(.88f,.85f,.71f),0,.65f,0);
-            Iris=Mat("Clouded synthetic iris",new Color(.35f,.44f,.40f),0,.55f,0);
             Plaster=Mat("Mineral wall finish",new Color(.67f,.69f,.63f),0,.18f,.14f);
             Carpet=Mat("Woven graphite carpet",new Color(.16f,.23f,.25f),0,.03f,.34f,1);
             Tile=Mat("Reception terrazzo",new Color(.55f,.58f,.52f),.08f,.62f,.34f,3);
