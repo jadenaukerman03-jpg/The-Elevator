@@ -86,6 +86,21 @@ namespace TheElevator.Generation
                 if (other.Layer == room.Layer) ports.Add(other.X > room.X ? 1 : other.X < room.X ? 3 : other.Z > room.Z ? 0 : 2);
             }
             if (room.Has(RoomRole.Entrance)) ports.Add(2);
+            // Blended neighbours share one room: no wall, and the gap between the cells becomes floor.
+            HashSet<int> blended = new HashSet<int>();
+            if (office)
+                for (int side = 0; side < 4; side++)
+                {
+                    MapRoom n = CellAt(room.X + OfficePlan.PortX[side], room.Z + OfficePlan.PortZ[side], room.Layer);
+                    if (n != null && office.Plan.Blended(room.Id, n.Id)) { blended.Add(side); ports.Remove(side); }
+                }
+            foreach (int side in blended) if (side <= 1) BlendSpan(geometry, room, side, height, wall, deck);
+            if (office && SameZone(room, 1, 0) && SameZone(room, 0, 1) && SameZone(room, 1, 1))
+            {
+                float gap = settings.CellSizeMillimeters / 1000f - 12, mid = 6 + gap / 2;
+                Box(geometry, "Floor slab", new Vector3(mid,-0.15f,mid), new Vector3(gap,0.3f,gap), deck);
+                Box(geometry, "Ceiling", new Vector3(mid,height + 0.10f,mid), new Vector3(gap,0.2f,gap), Workshop.Ink);
+            }
             int annex = office && office.Plan.MeetingRoom == room.Id ? office.Plan.MeetingAnnexSide : -1;
             if (annex >= 0)
             {
@@ -95,7 +110,7 @@ namespace TheElevator.Generation
             }
             for (int side = 0; side < 4; side++)
             {
-                if (side == annex) continue;
+                if (side == annex || blended.Contains(side)) continue;
                 Transform segment = w.Group("Wall " + side, geometry, Vector3.zero);
                 segment.localRotation = Quaternion.Euler(0, side * 90, 0);
                 float opening = room.Has(RoomRole.Entrance) && side == 2 ? 5f : settings.DoorWidthMillimeters / 1000f;
@@ -133,6 +148,30 @@ namespace TheElevator.Generation
                 Box(geometry, "Service conduit", new Vector3(side * 4.5f,height - 0.45f,0), new Vector3(0.16f,0.16f,11.6f), accent, false);
             }
             CombineStaticMeshes(geometry);
+        }
+
+        MapRoom CellAt(int x, int z, int layer) { return floor.Manifest.Rooms.Find(r => r.X == x && r.Z == z && r.Layer == layer); }
+        bool SameZone(MapRoom room, int dx, int dz)
+        {
+            MapRoom other = CellAt(room.X + dx, room.Z + dz, room.Layer);
+            return other != null && office.Plan.ZoneOf[other.Id] == office.Plan.ZoneOf[room.Id];
+        }
+
+        // Floor, ceiling and outer walls across the gap between two blended cells (built once, from the lower cell).
+        void BlendSpan(Transform geometry, MapRoom room, int side, float height, Color wall, Color deck)
+        {
+            float gap = settings.CellSizeMillimeters / 1000f - 12, mid = 6 + gap / 2;
+            Transform span = w.Group("Blended span " + side, geometry, Vector3.zero);
+            span.localRotation = Quaternion.Euler(0, side * 90, 0);
+            Box(span, "Floor slab", new Vector3(0,-0.15f,mid), new Vector3(12,0.3f,gap), deck);
+            Box(span, "Ceiling", new Vector3(0,height + 0.10f,mid), new Vector3(12,0.2f,gap), Workshop.Ink);
+            for (int sign = -1; sign <= 1; sign += 2)
+            {
+                int lateral = sign > 0 ? (side + 1) % 4 : (side + 3) % 4;
+                int lx = OfficePlan.PortX[lateral], lz = OfficePlan.PortZ[lateral];
+                bool interior = SameZone(room, lx, lz) && SameZone(room, OfficePlan.PortX[side] + lx, OfficePlan.PortZ[side] + lz);
+                if (!interior) Box(span, "Wall", new Vector3(sign * 6,height / 2,mid), new Vector3(0.24f,height,gap + 0.24f), wall);
+            }
         }
 
         // A room that runs two cells long: the neighbouring empty cell and the gap between them become one space.
@@ -221,6 +260,7 @@ namespace TheElevator.Generation
 
         void BuildCorridor(MapLink link)
         {
+            if (office && office.Plan.Blended(link.A, link.B)) return;
             MapRoom a = floor.Manifest.Rooms[link.A], b = floor.Manifest.Rooms[link.B];
             Vector3 center = (floor.Center(a) + floor.Center(b)) / 2;
             Transform root = w.Group("Link " + link.A + "-" + link.B + " / " + link.Kind, floor.transform, floor.transform.InverseTransformPoint(center));

@@ -44,7 +44,8 @@ namespace TheElevator.Office
             {
                 if(room.RoomId<=1||room.RoomId==Plan.TargetRoom||room.Kind==OfficeRoomKind.Breakroom||room.Kind==OfficeRoomKind.Gallery||room.Kind==OfficeRoomKind.Restroom)continue;
                 if(room.RoomId==Plan.MeetingRoom){PopulateMeeting();continue;}
-                int capacity=room.Kind==OfficeRoomKind.Workroom?Math.Min(2,Plan.Config.EmployeesPerRoom):1;
+                // Open-plan cells are busy: most of their eight desks are taken. Other rooms hold one person.
+                int capacity=room.Kind==OfficeRoomKind.Workroom?Plan.Config.EmployeesPerRoom+3:1;
                 foreach(OfficeTaskPoint task in Stations)
                 {
                     if(capacity<=0||Employees.Count>=Plan.Config.PopulationCap)break;
@@ -146,7 +147,22 @@ namespace TheElevator.Office
             foreach(var link in Map.Manifest.Links)
             {
                 if(link.A==Plan.TargetRoom||link.B==Plan.TargetRoom||Map.Manifest.Rooms[link.A].Layer!=Map.Manifest.Rooms[link.B].Layer)continue;
-                CreateDoor(link.A,link.B,false);
+                if(Plan.HasDoor(link.A,link.B))CreateDoor(link.A,link.B,false);
+            }
+        }
+        // Door signs name the room behind them.
+        string DoorName(int room)
+        {
+            switch(Plan.Rooms[room].Kind)
+            {
+                case OfficeRoomKind.Executive:return "PRIVATE OFFICE";
+                case OfficeRoomKind.Lounge:return "STAFF LOUNGE";
+                case OfficeRoomKind.Breakroom:return "COFFEE BAR";
+                case OfficeRoomKind.Restroom:return "RESTROOM";
+                case OfficeRoomKind.Server:return "SERVER ROOM";
+                case OfficeRoomKind.Records:return "RECORDS";
+                case OfficeRoomKind.Mailroom:return "MAILROOM";
+                default:return OfficePlan.Departments[Plan.Rooms[room].Department];
             }
         }
         void CreateDoor(int aId,int bId,bool locked)
@@ -154,17 +170,31 @@ namespace TheElevator.Office
             Vector3 a=Map.Center(Map.Manifest.Rooms[aId]),b=Map.Center(Map.Manifest.Rooms[bId]);
             Transform root=Kit.A.Group(transform,locked?"Badge-controlled door":"Operable office door",transform.InverseTransformPoint((a+b)*.5f));root.rotation=Quaternion.LookRotation(b-a);
             OfficeDoor door=root.gameObject.AddComponent<OfficeDoor>();door.Office=this;door.RoomA=aId;door.RoomB=bId;door.RequiredClearance=locked?2:0;door.Department=Plan.Rooms[aId].Department;door.Unlocked=!locked;
-            door.Left=Kit.A.Box(root,"Door left",new Vector3(-.69f,1.4f,0),new Vector3(1.36f,2.8f,.12f),locked?Kit.A.Metal:Kit.A.Wood,true).transform;
-            door.Right=Kit.A.Box(root,"Door right",new Vector3(.69f,1.4f,0),new Vector3(1.36f,2.8f,.12f),locked?Kit.A.Metal:Kit.A.Wood,true).transform;
+            // A doorframe wall fills the passage; one leaf hangs in it. The vault door is wide enough for its cargo.
+            float corridor=Map.Manifest.Recipe.Settings.CorridorWidthMillimeters/1000f,width=locked?2.2f:1.2f,panel=(corridor-width)/2,top=2.5f;
+            Material leaf=locked?Kit.A.Metal:Kit.A.Wood;
+            // The frame is solid architecture, not part of the moving door, so navigation treats it as a wall.
+            Transform frame=Kit.A.Group(transform,"Doorframe",root.localPosition);frame.localRotation=root.localRotation;
             for(int side=-1;side<=1;side+=2)
             {
-                Transform reader=Kit.A.Group(root,"Door control",new Vector3(1.49f,1.3f,side*.17f),side<0?0:180);
-                Kit.A.Box(reader,"Operable door button",Vector3.zero,new Vector3(.23f,.31f,.12f),Kit.A.Dark,true);
-                Kit.A.Box(reader,"Door control lamp",new Vector3(0,.065f,-.07f),new Vector3(.16f,.035f,.01f),locked?Kit.A.WarmLight:Kit.A.Screen);
-                Kit.A.Label(reader,locked?"BADGE / 02":"OPEN / CLOSE",new Vector3(0,-.03f,-.075f),.013f);
+                Kit.A.Box(frame,"Doorframe wall",new Vector3(side*(width/2+panel/2),1.6f,0),new Vector3(panel,3.2f,.14f),Kit.A.Plaster,true,false);
+                Kit.A.Box(frame,"Door jamb",new Vector3(side*(width/2+.04f),top/2,0),new Vector3(.08f,top,.18f),Kit.A.Dark);
             }
+            Kit.A.Box(frame,"Door header",new Vector3(0,(top+3.2f)/2,0),new Vector3(width,3.2f-top,.14f),Kit.A.Plaster,true,false);
+            door.Hinge=Kit.A.Group(root,"Door hinge",new Vector3(-width/2,0,0));
+            Kit.A.Box(door.Hinge,"Door leaf",new Vector3(width/2,top/2,0),new Vector3(width-.04f,top-.03f,.06f),leaf,true);
+            for(int face=-1;face<=1;face+=2)Kit.A.Box(door.Hinge,"Door handle",new Vector3(width-.14f,1.02f,face*.06f),new Vector3(.12f,.035f,.04f),Kit.A.Brass);
+            if(locked)Kit.A.Box(door.Hinge,"Vault stripe",new Vector3(width/2,1.25f,-.035f),new Vector3(width-.3f,.14f,.01f),Kit.A.Red);
             bool meeting=aId==Plan.MeetingRoom||bId==Plan.MeetingRoom;
-            Kit.A.Label(root,meeting?"MEETING IN PROGRESS":locked?"CONTROLLED ASSET":"M / OFFICE",new Vector3(0,2.25f,-.075f),.032f);
+            for(int face=-1;face<=1;face+=2)
+            {
+                Transform reader=Kit.A.Group(root,"Door control",new Vector3(width/2+.3f,1.3f,face*.1f),face<0?0:180);
+                Kit.A.Box(reader,"Operable door button",Vector3.zero,new Vector3(.2f,.28f,.06f),Kit.A.Dark,true);
+                Kit.A.Box(reader,"Door control lamp",new Vector3(0,.065f,-.035f),new Vector3(.14f,.03f,.01f),locked?Kit.A.WarmLight:Kit.A.Screen);
+                Transform sign=Kit.A.Group(frame,"Door sign",new Vector3(0,(top+3.2f)/2,face*.08f),face<0?0:180);
+                Kit.A.Label(sign,meeting?"MEETING IN PROGRESS":locked?"CONTROLLED ASSET":DoorName(face<0?bId:aId),Vector3.zero,.03f);
+            }
+            door.SetOpenForValidation(false);
             Doors.Add(door);
         }
     }

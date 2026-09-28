@@ -6,48 +6,6 @@ namespace TheElevator.Office
     // Deterministic authored detail clusters. Keep floor-level pieces within existing furniture footprints.
     public sealed partial class OfficeKit
     {
-        void RoomDetails(Transform root, MapRoom room, OfficeRoomPlan info)
-        {
-            Transform wall=A.Group(root,"Department identity and daily life",new Vector3(4.1f,0,5.60f));
-            for(int side=-1;side<=1;side+=2)A.Box(wall,"Noticeboard floor-supported post",new Vector3(side*1.05f,1.0f,.065f),new Vector3(.045f,2,.045f),A.Metal);
-            A.Box(wall,"Noticeboard surround",new Vector3(0,1.95f,0),new Vector3(2.35f,1.3f,.08f),A.Wood);
-            A.Box(wall,"Noticeboard felt",new Vector3(0,1.95f,-.05f),new Vector3(2.23f,1.18f,.025f),A.Upholstery);
-            string[] notices={"MANDATORY JOY\nTHURSDAY / 09:00","LOST: ONE HAND\nRETURN TO HR","SAFETY RECORD\n003 DAYS","COFFEE IS A\nREVOCABLE PRIVILEGE","PROMOTION LIST\nPENDING FOREVER","REMEMBER TO\nRECHARGE"};
-            for(int i=0;i<3;i++)
-            {
-                Transform sheet=A.Group(wall,"Pinned employee notice",new Vector3(-.72f+i*.72f,1.96f,-.075f));
-                sheet.localRotation=Quaternion.Euler(0,0,(i-1)*4);
-                A.Box(sheet,"Notice paper",Vector3.zero,new Vector3(.6f,.79f,.012f),A.Paper);
-                A.Box(sheet,"Notice department header",new Vector3(0,.27f,-.012f),new Vector3(.5f,.09f,.008f),A.DepartmentAccents[info.Department]);
-                A.Label(sheet,notices[(room.Id+i)%notices.Length],new Vector3(0,.07f,-.018f),.019f,Color.black);
-                for(int line=0;line<4;line++)A.Box(sheet,"Memo fine print",new Vector3(-.03f,-.1f-line*.045f,-.014f),new Vector3(.38f-line*.025f,.009f,.004f),A.Dark);
-                A.Round(sheet,"Notice pin",new Vector3(0,.36f,-.021f),new Vector3(.028f,.028f,.017f),A.Red,PrimitiveType.Sphere);
-            }
-            Transform clock=A.Group(root,"Oversized department clock",new Vector3(-3.3f,3.35f,5.58f));
-            A.Round(clock,"Clock face",Vector3.zero,new Vector3(1.2f,1.2f,.08f),A.Paper,PrimitiveType.Sphere);
-            A.W.Soft.Ring(clock,"Plum clock rim",Vector3.zero,.59f,.055f,A.W.Soft.Plum);
-            A.Box(clock,"Minute hand",new Vector3(.1f,.12f,-.075f),new Vector3(.075f,.45f,.035f),A.Red).transform.localRotation=Quaternion.Euler(0,0,-32);
-            A.Box(clock,"Hour hand",new Vector3(-.11f,0,-.09f),new Vector3(.30f,.085f,.04f),A.Dark);
-            for(int mark=0;mark<4;mark++){float angle=mark*Mathf.PI*.5f;A.Round(clock,"Clock marker",new Vector3(Mathf.Cos(angle)*.47f,Mathf.Sin(angle)*.47f,-.07f),new Vector3(.075f,.075f,.025f),A.Brass,PrimitiveType.Sphere);}            if(room.Id!=Plan.MeetingRoom)
-            {
-                A.Box(root,"Department plaque",new Vector3(3.2f,2.35f,-5.76f),new Vector3(1.55f,.42f,.05f),A.Dark);
-                A.Label(root,"M / "+OfficePlan.Departments[info.Department]+"\n"+info.Kind.ToString().ToUpper()+"  "+room.Id.ToString("000"),new Vector3(3.2f,2.35f,-5.73f),.031f,null,180);
-            }
-            // Slim safety equipment on the perimeter; never in the central transit cross.
-            Transform safety=A.Group(root,"Safety station",new Vector3(-5.55f,0,-4.9f),90);
-            A.Box(safety,"Fire equipment backing",new Vector3(0,1.2f,0),new Vector3(.5f,1.2f,.055f),A.Dark);
-            A.Round(safety,"Extinguisher tank",new Vector3(0,.95f,-.15f),new Vector3(.24f,.26f,.24f),A.Red);
-            A.Box(safety,"Extinguisher grip",new Vector3(0,1.28f,-.15f),new Vector3(.2f,.05f,.07f),A.Metal);
-            A.Box(safety,"Extinguisher hose",new Vector3(.14f,1.06f,-.15f),new Vector3(.035f,.39f,.035f),A.Dark);
-            A.Label(safety,"FIRE\nAND OTHER FEELINGS",new Vector3(0,1.64f,-.035f),.021f);
-            if(info.Kind==OfficeRoomKind.Lobby||info.Kind==OfficeRoomKind.Reception)
-            {
-                Transform brand=A.Group(root,"Corporate architectural emblem",new Vector3(-4.15f,2.92f,-5.65f),180);
-                A.Box(brand,"Brand backplate",Vector3.zero,new Vector3(2.4f,.76f,.06f),A.Wood);
-                A.Label(brand,"M O R R O W",new Vector3(0,.09f,-.047f),.075f);
-                A.Label(brand,"YOU BELONG TO SOMETHING BIGGER",new Vector3(0,-.2f,-.047f),.019f);
-            }
-        }
         void DeskDetails(Transform t,int room)
         {
             Transform phone=A.Group(t,"Desk telephone",new Vector3(.74f,.81f,.49f),-12);
