@@ -16,7 +16,7 @@ namespace TheElevator
         public MapSize MapScale = MapSize.Small;
         public FloorGenerationProfile ProfileOverride;
         public FloorContentCatalog ContentCatalog;
-        public bool UseManualSeed = true;
+        public bool UseManualSeed = false;
         public int ManualSeed = 104729;
         public GeneratedFloor CurrentMap { get; private set; }
         public OfficeFloor CurrentOffice { get { return CurrentMap ? CurrentMap.GetComponent<OfficeFloor>() : null; } }
@@ -44,6 +44,9 @@ namespace TheElevator
         Transform floor;
         float doorClosed = 1, transitClock;
         int seed, lastAlarm = -1;
+        int destinationFloor = 2;
+        readonly HashSet<int> completedFloors = new HashSet<int>();
+        public int HighestUnlocked { get; private set; } = 1;
         int retainedBadgeLevel=1, retainedBadgeDepartment=-1;
 
         void Awake()
@@ -60,7 +63,7 @@ namespace TheElevator
             RenderSettings.fogColor = new Color(0.085f, 0.14f, 0.15f);
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogDensity = 0.018f;
-            seed = UseManualSeed ? ManualSeed : System.Environment.TickCount;
+            seed = UseManualSeed ? ManualSeed : Guid.NewGuid().GetHashCode();
             if (!ContentCatalog) ContentCatalog = Resources.Load<FloorContentCatalog>("Generation/MorrowOffice");
             workshop = new Workshop();
             builder = new FacilityBuilder(this, workshop);
@@ -96,17 +99,18 @@ namespace TheElevator
             if (Phase != RunPhase.Briefing) return;
             Phase = RunPhase.Exploring;
             SetCursor(true);
-            Notify(CurrentOffice ? "Morrow Systems. Lift a supervisor badge with G, unlock the secured room, and recover the required asset." : "Collect valuables. Bring a power cell back and press F to connect it.");
+            Notify(CurrentOffice ? "Morrow Systems. The access card is on the reception counter. Read the field notebook in the lift." : "Collect valuables. Bring a power cell back and press F to connect it.");
             Sound.Play(660, 0.22f, 0.13f);
         }
 
         void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Escape) && Phase != RunPhase.Generating && Phase != RunPhase.Briefing && Phase != RunPhase.Won && Phase != RunPhase.Lost)
+            if (Input.GetKeyDown(KeyCode.Escape) && !Player.ReadingNotebook && Phase != RunPhase.Generating && Phase != RunPhase.Briefing && Phase != RunPhase.Won && Phase != RunPhase.Lost)
                 SetPaused(!Paused);
             if (Paused || Phase == RunPhase.Briefing || Phase == RunPhase.Won || Phase == RunPhase.Lost) return;
             RecountCargo();
-            builder.Display.text = "B" + (FloorIndex + 1).ToString("00") + "    " + Mathf.CeilToInt(Load) + "/180 KG    " + Mathf.CeilToInt(Power) + "% POWER";
+            UpdateFloorUnlock();
+            builder.Display.text = "FLOOR " + (FloorIndex + 1).ToString("00");
             if (Phase == RunPhase.Exploring)
             {
                 Clock = Mathf.Max(0, Clock - Time.deltaTime);
@@ -116,7 +120,7 @@ namespace TheElevator
                     lastAlarm = Mathf.CeilToInt(Clock);
                     Sound.Play(520, 0.11f, 0.12f);
                 }
-                if (Clock <= 0) StartClosing();
+                if (Clock <= 0) { destinationFloor=Mathf.Min(50,FloorIndex+2);StartClosing(); }
             }
             else if (Phase == RunPhase.Closing)
             {
@@ -268,6 +272,21 @@ namespace TheElevator
             }
         }
 
+        void UpdateFloorUnlock()
+        {
+            if(CurrentOffice && CurrentOffice.RequiredRecovered){completedFloors.Add(FloorIndex+1);HighestUnlocked=Mathf.Max(HighestUnlocked,Mathf.Min(50,FloorIndex+2));}
+        }
+        public bool CanSelectFloor(int number)
+        {
+            UpdateFloorUnlock();
+            return number>=1 && number<=HighestUnlocked && number!=FloorIndex+1 && Phase==RunPhase.Exploring && Player && Player.InCabin && (number<FloorIndex+1 || completedFloors.Contains(FloorIndex+1) || !CurrentOffice || CurrentOffice.RequiredRecovered);
+        }
+        public void SelectFloor(int number)
+        {
+            if(!CanSelectFloor(number))return;
+            RecountCargo();if(!RunRules.CanDepart(Power,Load)){Notify("Lift power insufficient. Connect a battery or unload cargo.");return;}
+            destinationFloor=number;StartClosing();
+        }
         public void RequestDeparture()
         {
             if (Phase != RunPhase.Exploring || !Player.InCabin) return;
@@ -279,6 +298,7 @@ namespace TheElevator
                 Sound.Play(120, 0.18f, 0.12f);
                 return;
             }
+            destinationFloor=Mathf.Min(50,FloorIndex+2);
             StartClosing();
         }
 
@@ -293,7 +313,7 @@ namespace TheElevator
         void Depart()
         {
             if (!Player.InCabin) { Finish(false, "The elevator departed without you. Attendance is mandatory."); return; }
-            if (CurrentOffice && !CurrentOffice.RequiredRecovered) { Finish(false,"Contract failed: optional cargo cannot replace the mandatory asset."); return; }
+            if (destinationFloor>FloorIndex+1 && !completedFloors.Contains(FloorIndex+1) && CurrentOffice && !CurrentOffice.RequiredRecovered) { Finish(false,"Contract failed: optional cargo cannot replace the mandatory asset."); return; }
             if (CurrentOffice)
             {
                 CurrentOffice.Transported = null;
@@ -333,13 +353,7 @@ namespace TheElevator
 
         void Arrive()
         {
-            if (FloorIndex + 1 >= RunRules.FloorCount)
-            {
-                RecountCargo();
-                Finish(true, "Shift complete. Your cargo made it to dispatch.");
-                return;
-            }
-            FloorIndex++;
+            FloorIndex = Mathf.Clamp(destinationFloor - 1,0,49);
             if (UseProceduralFloors) { CurrentMap = null; StartCoroutine(GenerateFloor(false, null)); return; }
             floor = builder.Floor(FloorIndex, seed);
             Clock = RunRules.FloorSeconds;
@@ -421,4 +435,9 @@ namespace TheElevator
         }
     }
 }
+
+
+
+
+
 

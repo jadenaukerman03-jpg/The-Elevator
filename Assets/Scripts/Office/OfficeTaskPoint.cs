@@ -8,6 +8,12 @@ namespace TheElevator.Office
         public bool Seated;
         public OfficeEmployee Occupant;
         public bool ReservedByPlayer;
-        public bool Available { get { return !Occupant && !ReservedByPlayer; } }
+        public bool EquipmentMissing;
+        public OfficeEmployee HomeOwner;
+        public OfficeEquipment Equipment;
+        public OfficeCoffeeStation Coffee;
+        public bool Available { get { return !Occupant && !HomeOwner && !ReservedByPlayer; } }
     }
 }
+
+

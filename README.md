@@ -1,6 +1,6 @@
 # The Elevator
 
-**First floor — Morrow Systems:** choose **The Elevator > Office > Open Showcase**. Seed **104729**, Small, High demonstrates 18 rooms, 36 employees, badge theft, secured access and a mandatory vending-machine extraction. Use G behind employees, T at free workstations, E at doors/the dolly and B when questioned. See [the office implementation report](Docs/Office/SHOWCASE.md) for controls, evidence, tests, changed files and the remaining visual-quality gap. This is a working preproduction slice, not finished character/environment art. Both the normal Prototype entry and the default build now start in this office.
+**First floor — Morrow Systems:** choose **The Elevator > Play Updated Office**. New runs randomize the office layout. A bright access card is always on reception; recover the required asset to unlock floor 2 on the right-hand elevator panel. Read the physical notebook on the cabin table for controls. See [the elevator revision](Docs/Office/ELEVATOR-REVISION.md). Both launch scenes start in this office.
 
 A standalone Unity 3D prototype about disposable maintenance workers exploring an impossible municipal facility from a freight elevator. Oversized boots, uneasy faces, bad paperwork, suspicious valuables.
 
@@ -11,7 +11,7 @@ A standalone Unity 3D prototype about disposable maintenance workers exploring a
 1. In Unity Hub, open this **TheElevator** folder, containing Assets, Packages and ProjectSettings. Use Unity **6000.3.25f1** and the built-in rendering pipeline.
 2. Choose **The Elevator > Open Prototype**, then press **Play**.
 3. Wait for generation, choose a uniform, and click **Clock In**.
-4. On the first floor, steal a supervisor badge from behind with G, open the secured room with E, and haul the required asset fully into the lift before pressing R.
+4. On the first floor, pick up the reception access card, open the secured room, and haul the required asset fully into the lift before selecting the newly unlocked number.
 
 The world is assembled when Play starts. For an edit-mode map, open **The Elevator > Generation Lab**, choose a preset, click **Generate graph**, then **Build 3D preview**. The preview lives in a separate temporary scene and clears before Play.
 
@@ -40,10 +40,11 @@ Cargo recovered in the cabin persists between floors. Three incidents end the ru
 |---|---|
 | WASD / mouse | Move / look |
 | Shift / Space | Sprint / jump |
+| Ctrl or C | Crouch |
 | E | Pick up, drop, or use survey terminal |
-| Q | Throw held object |
+| Hold/release Q | Charge/release throw; tap gently drops; E cancels |
 | F | Connect held power cell inside lift |
-| R | Depart early from inside lift |
+| E / left click on a floor number | Select an unlocked elevator floor |
 | L | Flashlight |
 | Escape | Pause |
 | F3 | Developer generation panel: seed, size, replay, graph |
@@ -68,5 +69,7 @@ The last command copies source/settings into TestResults/GenerationValidation an
 Use **The Elevator > Build Windows Player** to build Builds/Windows/TheElevator.exe; distribute the entire output folder. A standalone build has not been verified this milestone.
 
 Current limits: primitive placeholder interiors, fixed 12 m room kit, graph-based enemy navigation, no transport, proximity voice, locked-door gameplay, event behaviors, progression save or destruction. Content sockets and semantic zones provide extension points. Physics and live AI are not deterministic network simulation.
+
+
 
 

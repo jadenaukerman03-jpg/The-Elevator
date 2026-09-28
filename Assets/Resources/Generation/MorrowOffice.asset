@@ -15,7 +15,7 @@ MonoBehaviour:
   ThemeId: morrow-office
   ThemePayload: '{"Version":1,"Corporation":"MORROW SYSTEMS","Slogan":"A BETTER TOMORROW.
     ON REPEAT.","Quality":2,"EmployeesPerRoom":2,"PopulationCap":320,"ActiveDistance":34.0,"BadgesExpireOnDeparture":true,"InvalidateBadgesOnAlarm":false,"ForcedObjective":-1}'
-  ThemeRevision: 1
+  ThemeRevision: 2
   Modules:
   - Id: arrival
     Style: 0
@@ -77,3 +77,4 @@ MonoBehaviour:
   RecordsAccent: {r: 0.95, g: 0.67, b: 0.21, a: 1}
   UtilitiesAccent: {r: 0.21, g: 0.67, b: 0.78, a: 1}
   DispatchAccent: {r: 0.83, g: 0.35, b: 0.25, a: 1}
+

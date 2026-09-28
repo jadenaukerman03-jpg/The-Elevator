@@ -9,6 +9,7 @@ namespace TheElevator.Office
         void RoomDetails(Transform root, MapRoom room, OfficeRoomPlan info)
         {
             Transform wall=A.Group(root,"Department identity and daily life",new Vector3(4.1f,0,5.60f));
+            for(int side=-1;side<=1;side+=2)A.Box(wall,"Noticeboard floor-supported post",new Vector3(side*1.05f,1.0f,.065f),new Vector3(.045f,2,.045f),A.Metal);
             A.Box(wall,"Noticeboard surround",new Vector3(0,1.95f,0),new Vector3(2.35f,1.3f,.08f),A.Wood);
             A.Box(wall,"Noticeboard felt",new Vector3(0,1.95f,-.05f),new Vector3(2.23f,1.18f,.025f),A.Upholstery);
             string[] notices={"MANDATORY JOY\nTHURSDAY / 09:00","LOST: ONE HAND\nRETURN TO HR","SAFETY RECORD\n003 DAYS","COFFEE IS A\nREVOCABLE PRIVILEGE","PROMOTION LIST\nPENDING FOREVER","REMEMBER TO\nRECHARGE"};
@@ -75,8 +76,8 @@ namespace TheElevator.Office
             for(int i=0;i<6;i++)
             {
                 A.Box(t,"Backsplash tile",new Vector3(-.86f+i*.34f,1.15f,.7f),new Vector3(.328f,.32f,.025f),A.Tile);
-                A.Box(t,"Upper cupboard",new Vector3(-.86f+i*.34f,1.99f,.66f),new Vector3(.328f,.56f,.26f),A.Plastic);
-                A.Box(t,"Cupboard pull",new Vector3(-.86f+i*.34f,1.85f,.52f),new Vector3(.11f,.025f,.025f),A.Brass);
+                if(i!=0)A.Box(t,"Upper cupboard",new Vector3(-.86f+i*.34f,1.99f,.66f),new Vector3(.328f,.56f,.26f),A.Plastic);
+                if(i!=0)A.Box(t,"Cupboard pull",new Vector3(-.86f+i*.34f,1.85f,.52f),new Vector3(.11f,.025f,.025f),A.Brass);
             }
             A.Box(t,"Drip tray",new Vector3(-.55f,.99f,.05f),new Vector3(.36f,.025f,.22f),A.Metal);
             for(int i=0;i<4;i++)A.Box(t,"Drip tray slots",new Vector3(-.68f+i*.085f,1.006f,.05f),new Vector3(.012f,.005f,.15f),A.Dark);
@@ -109,3 +110,5 @@ namespace TheElevator.Office
         }
     }
 }
+
+

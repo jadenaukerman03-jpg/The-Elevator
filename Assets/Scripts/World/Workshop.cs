@@ -55,7 +55,7 @@ namespace TheElevator
         }
 
         public TextMesh Label(string text, Transform parent, Vector3 position, float size, Color color,
-            float yaw = 0f)
+            float yaw = 0f, bool backing = true)
         {
             Transform t = Group(text, parent, position);
             t.localRotation = Quaternion.Euler(0, yaw, 0);
@@ -75,6 +75,11 @@ namespace TheElevator
             mesh.anchor = TextAnchor.MiddleCenter;
             mesh.alignment = TextAlignment.Center;
             mesh.color = color;
+            if(backing)
+            {
+                Bounds bounds=mesh.GetComponent<Renderer>().localBounds;
+                Shape("Printed sign backing",t,bounds.center+Vector3.forward*.005f,new Vector3(Mathf.Max(.03f,bounds.size.x+.008f),Mathf.Max(.02f,bounds.size.y+.008f),.006f),color.grayscale<.35f?Cream:Ink,PrimitiveType.Cube,false);
+            }
             return mesh;
         }
 
@@ -106,3 +111,4 @@ namespace TheElevator
         }
     }
 }
+

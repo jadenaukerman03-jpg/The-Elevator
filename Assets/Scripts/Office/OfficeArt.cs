@@ -8,11 +8,17 @@ namespace TheElevator.Office
         public readonly Workshop W;
         public Material Plaster, Carpet, Tile, Wood, Metal, Dark, Plastic, Paper, Upholstery, Screen, WarmLight, CoolLight, Glass, Brass, Red;
         public Material[] DepartmentAccents;
+        public Material Skin, HeadSkin, Lips, Eyes, Iris;
         public int Pieces;
         static Mesh rounded;
         public OfficeArt(Workshop workshop)
         {
             W=workshop;
+            Skin=Mat("Pale synthetic dermis",new Color(.69f,.65f,.54f),0,.24f,.025f);
+            HeadSkin=W.Own(new Material(Skin));HeadSkin.name="Continuous face dermis";HeadSkin.SetFloat("_VertexTint",1);
+            Lips=Mat("Muted synthetic lips",new Color(.43f,.33f,.28f),0,.18f,.015f);
+            Eyes=Mat("Ivory sclera",new Color(.88f,.85f,.71f),0,.65f,0);
+            Iris=Mat("Clouded synthetic iris",new Color(.35f,.44f,.40f),0,.55f,0);
             Plaster=Mat("Mineral wall finish",new Color(.67f,.69f,.63f),0,.18f,.14f);
             Carpet=Mat("Woven graphite carpet",new Color(.16f,.23f,.25f),0,.03f,.34f,1);
             Tile=Mat("Reception terrazzo",new Color(.55f,.58f,.52f),.08f,.62f,.34f,3);
@@ -24,7 +30,7 @@ namespace TheElevator.Office
             Upholstery=Mat("Sage wool",new Color(.23f,.34f,.29f),0,.08f,.3f,1);
             Brass=Mat("Anodized champagne",new Color(.64f,.43f,.19f),.65f,.52f,.08f);
             Red=Mat("Corporate vermilion",new Color(.66f,.15f,.075f),.1f,.3f,.1f);
-            Screen=Mat("Phosphor display",new Color(.045f,.13f,.13f),.15f,.65f,.02f); Screen.SetColor("_Emission",new Color(.035f,.21f,.17f));
+            Screen=Mat("Phosphor display",new Color(.045f,.13f,.13f),.15f,.65f,.02f); Screen.shader=Shader.Find("Elevator/OfficeDisplay");Screen.color=new Color(.025f,.06f,.09f);Screen.SetColor("_Emission",new Color(.02f,.055f,.085f));
             WarmLight=Mat("Warm opal diffuser",new Color(.95f,.85f,.61f),0,.4f,0); WarmLight.SetColor("_Emission",new Color(1,.72f,.37f)*1.1f);
             CoolLight=Mat("Neutral opal diffuser",new Color(.7f,.88f,.85f),0,.4f,0); CoolLight.SetColor("_Emission",new Color(.5f,.78f,.75f)*1.1f);
             Glass=W.Own(new Material(Shader.Find("Elevator/OfficeGlass"))); Glass.name="Etched privacy glass";
@@ -76,3 +82,5 @@ namespace TheElevator.Office
         }
     }
 }
+
+

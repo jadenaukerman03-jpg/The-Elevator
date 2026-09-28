@@ -93,7 +93,12 @@ namespace TheElevator.Generation
         public void PrepareVisibility()
         {
             roomRenderers = new Renderer[RoomRoots.Count][];
-            for (int i = 0; i < RoomRoots.Count; i++) roomRenderers[i] = RoomRoots[i].GetComponentsInChildren<Renderer>();
+            for (int i = 0; i < RoomRoots.Count; i++) {
+                List<Renderer> fixedRenderers=new List<Renderer>();
+                foreach(Renderer renderer in RoomRoots[i].GetComponentsInChildren<Renderer>())
+                    if(!renderer.GetComponentInParent<SalvageItem>(true))fixedRenderers.Add(renderer);
+                roomRenderers[i]=fixedRenderers.ToArray();
+            }
             lights.AddRange(GetComponentsInChildren<Light>());
         }
         void Update()
@@ -112,3 +117,4 @@ namespace TheElevator.Generation
     }
 
 }
+

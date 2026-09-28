@@ -268,7 +268,7 @@ namespace TheElevator.Generation
             Box(root, "Station display", new Vector3(0,1.25f,-0.32f), new Vector3(0.6f,0.35f,0.035f), Workshop.Mint, false);
             ObjectiveTerminal terminal = root.gameObject.AddComponent<ObjectiveTerminal>();
             terminal.Floor = floor; terminal.SocketId = socket.StableId;
-            w.Label("SURVEY / " + socket.RoomId.ToString("000"), root, new Vector3(0,1.85f,0), 0.04f, Workshop.Mint);
+            w.Label("SURVEY / " + socket.RoomId.ToString("000"), root, new Vector3(0,1.04f,-.327f), 0.027f, Workshop.Mint);
         }
 
         void CombineStaticMeshes(Transform root)
@@ -278,7 +278,7 @@ namespace TheElevator.Generation
             foreach (MeshFilter filter in root.GetComponentsInChildren<MeshFilter>())
             {
                 MeshRenderer renderer = filter.GetComponent<MeshRenderer>();
-                if (!renderer || !filter.sharedMesh || filter.GetComponent<TextMesh>() || filter.GetComponentInParent<Rigidbody>() || filter.sharedMesh.subMeshCount != 1) continue;
+                if (!renderer || !filter.sharedMesh || filter.GetComponent<TextMesh>() || filter.GetComponentInParent<Rigidbody>(true) || (filter.GetComponentInParent<TheElevator.Office.OfficeEquipment>(true) && filter.GetComponentInParent<TheElevator.Office.OfficeEquipment>(true).Recoverable) || filter.sharedMesh.subMeshCount != 1) continue;
                 Material mat = renderer.sharedMaterial;
                 if (!mat) continue;
                 if (!groups.ContainsKey(mat)) groups[mat] = new List<CombineInstance>();
@@ -307,3 +307,6 @@ namespace TheElevator.Generation
         }
     }
 }
+
+
+

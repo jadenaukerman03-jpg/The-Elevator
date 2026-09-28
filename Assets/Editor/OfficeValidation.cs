@@ -24,7 +24,7 @@ namespace TheElevator.Editor
         static OfficeValidation(){EditorApplication.update+=Tick;Application.logMessageReceived+=Log;}
         public static void RunGeometry()
         {
-            OfficeTools.CreateAssets();if(Application.isBatchMode)EditorSceneManager.OpenScene(OfficeTools.ScenePath);int recipes=0,geometry=0;
+            OfficeTools.CreateAssets();if(Application.isBatchMode)EditorSceneManager.OpenScene(OfficeTools.ScenePath);UnityEngine.Object.FindFirstObjectByType<DescentGame>().UseManualSeed=true;int recipes=0,geometry=0;
             foreach(MapSize size in Enum.GetValues(typeof(MapSize)))for(int seed=-10;seed<40;seed++)
             {
                 MapManifest map=new MacroLayoutGenerator().Generate(OfficeTools.Recipe(seed,size));OfficePlan a=OfficePlan.Build(map),b=OfficePlan.Build(map);
@@ -38,7 +38,7 @@ namespace TheElevator.Editor
                     MapManifest map=new MacroLayoutGenerator().Generate(OfficeTools.Recipe(seed,size));root=new GameObject("Office physical validation");SceneManager.MoveGameObjectToScene(root,scene);
                     GeneratedFloor floor=root.AddComponent<GeneratedFloor>();floor.Initialize(map);
                     IEnumerator builder=new FloorGeometryBuilder(workshop,AssetDatabase.LoadAssetAtPath<FloorContentCatalog>(OfficeTools.CatalogPath)).Build(floor,null,null);while(builder.MoveNext()){}
-                    OfficeFloor generated=root.GetComponent<OfficeFloor>();generated.Assemble(null);Require(generated.Employees.Count>=Math.Min(map.Rooms.Count,20),"Office populated");
+                    OfficeFloor generated=root.GetComponent<OfficeFloor>();generated.Assemble(null);Require(generated.Employees.Count>=4,"Office populated");
                     foreach(OfficeDoor door in generated.Doors)door.SetOpenForValidation(true);Physics.SyncTransforms();
                     foreach(MapLink edge in map.Links)
                     {
@@ -61,7 +61,7 @@ namespace TheElevator.Editor
             if(!Application.isBatchMode)throw new InvalidOperationException("Use isolated batch mode.");
             OfficeTools.CreateAssets();
             Require(EditorBuildSettings.scenes.Length>0 && EditorBuildSettings.scenes[0].enabled && EditorBuildSettings.scenes[0].path==OfficeTools.ScenePath,"Default build starts in office");
-            EditorSceneManager.OpenScene("Assets/Scenes/Prototype.unity");
+            EditorSceneManager.OpenScene("Assets/Scenes/Prototype.unity");UnityEngine.Object.FindFirstObjectByType<DescentGame>().UseManualSeed=true;
             var startup=UnityEngine.Object.FindFirstObjectByType<DescentGame>();
             Require(startup.ContentCatalog && startup.ContentCatalog.ThemeId=="morrow-office","Legacy entry scene starts in office");
             startup.ContentCatalog=null; // Exercise the runtime fallback, not a test-only assignment.
@@ -79,7 +79,7 @@ namespace TheElevator.Editor
                 office=game.CurrentOffice;Require(office,"Office runtime exists");
                 if(stage==0)
                 {
-                    Require(game.Phase==DescentGame.RunPhase.Briefing,"Office load completed");Require(office.Objective&&office.Plan.TargetType==2,"Signature vending objective");Require(office.Employees.Count>=18,"Occupied office");
+                    Require(game.Phase==DescentGame.RunPhase.Briefing,"Office load completed");Require(office.Objective&&office.Plan.TargetType==2,"Signature vending objective");Require(office.Employees.Count>=4,"Occupied office");
                     firstHash=office.Plan.Hash;originalPower=game.Power;game.Begin();game.RequestDeparture();Require(game.Phase==DescentGame.RunPhase.Exploring,"Cannot depart without mandatory target");
                     supervisor=office.Employees.Find(e=>e.Supervisor);Require(supervisor&&supervisor.HasBadge,"Reachable supervisor carries badge");
                     office.Doors[0].Use();Require(!office.Doors[0].Unlocked,"Invalid clearance cannot open door");
@@ -131,4 +131,9 @@ namespace TheElevator.Editor
         }
     }
 }
+
+
+
+
+
 

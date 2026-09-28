@@ -30,11 +30,18 @@ namespace TheElevator.Editor
             if(!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())return;
             CreateAssets();EditorSceneManager.OpenScene(ScenePath);
         }
+        [MenuItem("The Elevator/Play Updated Office")]
+        public static void PlayUpdatedOffice()
+        {
+            if(EditorApplication.isPlaying){EditorApplication.isPlaying=false;return;}
+            if(!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())return;
+            CreateAssets();EditorSceneManager.OpenScene(ScenePath);EditorApplication.isPlaying=true;
+        }
         public static void CreateAssets()
         {
             if(!AssetDatabase.LoadAssetAtPath<FloorContentCatalog>(CatalogPath))
             {
-                FloorContentCatalog theme=ScriptableObject.CreateInstance<FloorContentCatalog>();theme.ThemeId="morrow-office";theme.ThemeRevision=1;theme.ThemePayload=JsonUtility.ToJson(new OfficeConfig());
+                FloorContentCatalog theme=ScriptableObject.CreateInstance<FloorContentCatalog>();theme.ThemeId="morrow-office";theme.ThemeRevision=2;theme.ThemePayload=JsonUtility.ToJson(new OfficeConfig());
                 theme.WallColor=new Color(.65f,.66f,.59f);theme.FloorColor=new Color(.19f,.23f,.21f);
                 foreach(DistrictSpec department in theme.Districts)department.WetFloor=false;
                 AssetDatabase.CreateAsset(theme,CatalogPath);AssetDatabase.SaveAssets();
@@ -42,7 +49,7 @@ namespace TheElevator.Editor
             if(!File.Exists(ScenePath))
             {
                 Scene scene=EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,NewSceneMode.Single);
-                DescentGame game=new GameObject("Morrow office bootstrap").AddComponent<DescentGame>();game.ContentCatalog=AssetDatabase.LoadAssetAtPath<FloorContentCatalog>(CatalogPath);game.UseManualSeed=true;game.ManualSeed=104729;game.MapScale=MapSize.Small;
+                DescentGame game=new GameObject("Morrow office bootstrap").AddComponent<DescentGame>();game.ContentCatalog=AssetDatabase.LoadAssetAtPath<FloorContentCatalog>(CatalogPath);game.UseManualSeed=false;game.ManualSeed=104729;game.MapScale=MapSize.Small;
                 EditorSceneManager.SaveScene(scene,ScenePath);
             }
         }
@@ -95,3 +102,6 @@ namespace TheElevator.Editor
         }
     }
 }
+
+
+

@@ -6,6 +6,7 @@ namespace TheElevator.Office
         public OfficeFloor Office;
         public SalvageItem Item;
         public bool Mandatory;
+        public OfficeTaskPoint Workstation;
         public bool Mounted=true;
         public float Condition=1;
         public Vector3 SpawnPosition,LastSafePosition;
@@ -57,3 +58,4 @@ namespace TheElevator.Office
         }
     }
 }
+

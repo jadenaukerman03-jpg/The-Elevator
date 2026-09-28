@@ -5,7 +5,7 @@ using TheElevator.Generation;
 
 namespace TheElevator.Office
 {
-    public sealed class OfficeFloor : MonoBehaviour
+    public sealed partial class OfficeFloor : MonoBehaviour
     {
         public OfficeKit Kit { get; private set; }
         public OfficePlan Plan { get { return Kit.Plan; } }
@@ -41,21 +41,17 @@ namespace TheElevator.Office
             Game=game;Stations.AddRange(GetComponentsInChildren<OfficeTaskPoint>(true));
             OfficeTaskPoint supervisor=Stations.Find(s=>s.RoomId==Plan.SupervisorRoom);
             if(!supervisor)throw new InvalidOperationException("Credential holder has no usable workstation.");
-            SpawnEmployee(supervisor,true);
-            foreach(OfficeTaskPoint task in Stations)
-            {
-                if(Employees.Count>=Math.Min(Plan.Config.PopulationCap,Map.Manifest.Rooms.Count*Plan.Config.EmployeesPerRoom))break;
-                if(task.Occupant||task.RoomId==Plan.TargetRoom)continue;
-                SpawnEmployee(task,false);
-            }
+            PrepareWorkplaces();
+            PopulateEmployees(supervisor);
+            BuildDeskKeycard(supervisor);
             BuildDoors();
             if(Game)
             {
-                BuildCargo();
+                BuildCargo(); MakeComputersStealable();
                 SetupSound();
                 officeLights=GetComponentsInChildren<Light>(true);
                 // Appearance switches only for the office theme; Civic Works keeps its worker model.
-                Game.Player.Model.UseOfficeRig(Kit.A);
+                Game.Player.Model.UseOfficeRig(Kit.A);Game.Player.InitializeHands(Kit.A);
                 RenderSettings.ambientLight=new Color(.16f,.19f,.18f);
                 RenderSettings.fogDensity=.008f;
             }
@@ -70,24 +66,9 @@ namespace TheElevator.Office
         }
         void BuildDoors()
         {
-            foreach(int other in Map.Manifest.Neighbors(Plan.TargetRoom))
-            {
-                Vector3 a=Map.Center(Map.Manifest.Rooms[Plan.TargetRoom]),b=Map.Center(Map.Manifest.Rooms[other]);
-                Transform root=Kit.A.Group(transform,"Badge-controlled door",transform.InverseTransformPoint((a+b)*.5f));root.rotation=Quaternion.LookRotation(b-a);
-                OfficeDoor door=root.gameObject.AddComponent<OfficeDoor>();door.Office=this;door.Department=Plan.Rooms[Plan.TargetRoom].Department;
-                door.Left=Kit.A.Box(root,"Security door left",new Vector3(-.69f,1.4f,0),new Vector3(1.36f,2.8f,.12f),Kit.A.Metal,true).transform;
-                door.Right=Kit.A.Box(root,"Security door right",new Vector3(.69f,1.4f,0),new Vector3(1.36f,2.8f,.12f),Kit.A.Metal,true).transform;
-                for(int sign=-1;sign<=1;sign+=2)
-                {
-                    Transform face=Kit.A.Group(root,"Credential reader",new Vector3(0,0,sign*.13f),sign<0?0:180);
-                    Kit.A.Box(face,"Badge-reader",new Vector3(.85f,1.32f,0),new Vector3(.24f,.38f,.08f),Kit.A.Dark);
-                    Kit.A.Box(face,"Amber reader light",new Vector3(.85f,1.4f,-.05f),new Vector3(.14f,.045f,.02f),Kit.A.WarmLight);
-                    Kit.A.Label(face,"CONTROLLED ASSET\nDEPARTMENT BADGE / 02",new Vector3(0,2.18f,-.055f),.035f);
-                }
-                Doors.Add(door);
-            }
-        }
-        void BuildCargo()
+            foreach(int other in Map.Manifest.Neighbors(Plan.TargetRoom))CreateDoor(Plan.TargetRoom,other,true);
+            AddRoomDoors();
+        }        void BuildCargo()
         {
             Vector3 size=Plan.TargetBounds;Vector3 position=Map.Center(Map.Manifest.Rooms[Plan.TargetRoom])+new Vector3(3.5f,size.y*.5f+.13f,3.5f);
             Transform root=Kit.A.Group(transform,"MANDATORY / "+Plan.TargetName,transform.InverseTransformPoint(position));
@@ -151,15 +132,16 @@ namespace TheElevator.Office
         }
         public void ReportToSecurity(int department,float amount,Vector3 lastSeen){LastReportedPosition=lastSeen;RaiseLocal(department,amount);}
         public void ReportAction(Vector3 point,float amount,OfficeEmployee excluded)
-        { foreach(OfficeEmployee employee in Employees)if(employee!=excluded&&employee.Sees(point))employee.Suspicion=Mathf.Clamp(employee.Suspicion+amount,0,100); }
+        { foreach(OfficeEmployee employee in Employees)if(employee!=excluded&&employee.Sees(point))employee.React(amount,"What are you doing with company property?"); }
         public void HearNoise(Vector3 point,float strength)
         { foreach(OfficeEmployee employee in Employees)if(Vector3.Distance(employee.transform.position,point)<strength*12) { employee.Robot.LookTarget=point;employee.Suspicion=Mathf.Min(100,employee.Suspicion+strength*4); } }
         public bool InteractPressed()
         {
             if(!Game||!Game.ControlsActive)return false;
             Ray ray=Game.Player.View.ViewportPointToRay(new Vector3(.5f,.5f,0));
-            if(Physics.SphereCast(ray,.18f,out RaycastHit hit,2.8f,Physics.DefaultRaycastLayers,QueryTriggerInteraction.Ignore))
+            if(Physics.Raycast(ray,out RaycastHit hit,2.8f,Physics.DefaultRaycastLayers,QueryTriggerInteraction.Ignore))
             {
+                OfficeKeycard card=hit.collider.GetComponentInParent<OfficeKeycard>();if(card){card.Take();return true;}
                 OfficeDoor door=hit.collider.GetComponentInParent<OfficeDoor>();if(door){door.Use();return true;}
                 OfficeCargo cargo=hit.collider.GetComponentInParent<OfficeCargo>();
                 if(cargo&&cargo.Mandatory)
@@ -210,6 +192,10 @@ namespace TheElevator.Office
             if(Game)foreach(Collider col in Game.GetComponentsInChildren<Collider>(true))if(col.enabled&&(col.name=="Left door"||col.name=="Right door")){col.enabled=false;disabled.Add(col);}
             foreach(OfficeEmployee employee in Employees)foreach(Collider col in employee.GetComponentsInChildren<Collider>())if(col.enabled){col.enabled=false;disabled.Add(col);}
             if(Objective)foreach(Collider col in Objective.GetComponentsInChildren<Collider>())if(col.enabled){col.enabled=false;disabled.Add(col);}
+            // Persistent cargo is a movable gameplay obstacle, not a defect in the newly generated architecture.
+            if(Game)foreach(SalvageItem cargo in Game.Items)
+                if(cargo&&(!Objective||cargo!=Objective.Item)&&DescentGame.InCabin(cargo.transform.position))
+                    foreach(Collider col in cargo.GetComponentsInChildren<Collider>())if(col.enabled){col.enabled=false;disabled.Add(col);}
             Physics.SyncTransforms();
             try
             {
@@ -249,9 +235,21 @@ namespace TheElevator.Office
         void OnGUI()
         {
             if(!Game||!Game.ControlsActive)return;
+            if(Plan.MeetingRoom>=0&&Vector3.Distance(Game.Player.transform.position,Map.Center(Map.Manifest.Rooms[Plan.MeetingRoom]))<10)
+                GUI.Box(new Rect(Screen.width*.5f-300,Screen.height-205,600,35),"MEETING: "+MeetingLine);
+            float suspicion=SuspicionLevel;Color saved=GUI.color;
+            GUI.Box(new Rect(Screen.width-290,25,265,72),"SUSPICION / "+Mathf.RoundToInt(suspicion)+"%");
+            GUI.color=new Color(.13f,.16f,.16f);GUI.DrawTexture(new Rect(Screen.width-274,56,233,16),Texture2D.whiteTexture);
+            GUI.color=Color.Lerp(new Color(.75f,.73f,.23f),new Color(.9f,.15f,.08f),suspicion/100);GUI.DrawTexture(new Rect(Screen.width-274,56,233*suspicion/100,16),Texture2D.whiteTexture);GUI.color=saved;
+            GUI.Label(new Rect(Screen.width-274,75,235,20),suspicion>55?"REPORTED / SECURITY RISK":suspicion>20?"WATCHED / EXPLAIN YOURSELF":"UNNOTICED");
             GUI.Box(new Rect(20,Screen.height-154,560,114),"");
-            GUI.Label(new Rect(34,Screen.height-146,530,100),"CONTRACT / "+Plan.TargetName.ToUpper()+"\n"+(RequiredRecovered?"REQUIRED ASSET SECURED":"MANDATORY / ROOM "+Plan.TargetRoom.ToString("000"))+"   |   COVER: FACILITIES ASSISTANT\nBADGE "+BadgeLevel+"   SECURITY "+SecurityAlert+"   "+(Blending?"LOOKING PRODUCTIVE":"")+"\n"+Prompt);
+            GUI.Label(new Rect(34,Screen.height-146,530,100),"CONTRACT / "+Plan.TargetName.ToUpper()+"\n"+(RequiredRecovered?"REQUIRED ASSET SECURED":"MANDATORY / ROOM "+Plan.TargetRoom.ToString("000"))+"   |   COVER: FACILITIES ASSISTANT\nBADGE "+BadgeLevel+"   SECURITY "+SecurityAlert+"   "+(Blending?"LOOKING PRODUCTIVE":""));
         }
         void OnDestroy(){if(officeHum)Destroy(officeHum);if(tone)Destroy(tone);}
     }
 }
+
+
+
+
+

@@ -49,7 +49,7 @@ namespace TheElevator
 
         void OnGUI()
         {
-            if (!game || !game.Player) return;
+            if (!game || !game.Player || game.Player.ReadingNotebook) return;
             Styles();
             float scale = Mathf.Min(Screen.width / 1280f, Screen.height / 720f);
             float width = Screen.width / scale;
@@ -71,8 +71,8 @@ namespace TheElevator
                 Text(new Rect(66, 61, 520, 24), "FACILITY SERVICES / EMPLOYEE INDUCTION 004", small);
                 Text(new Rect(62, 100, 535, 160), "THE\nELEVATOR", title);
                 Text(new Rect(66, 277, 505, 35), game.CurrentOffice ? "FLOOR 1 / MORROW SYSTEMS" : "Going down. Mostly.", heading);
-                Text(new Rect(66, 332, 500, 80), game.CurrentOffice ? "You are here to steal office equipment. Lift a supervisor badge, open the secured room, and bring the required asset back to the elevator." : game.UseProceduralFloors ? "A sprawling facility. One freight lift. Find remote survey stations, recover valuables, and remember your way back." : "Three floors. One freight lift. Grab whatever looks expensive and get back before the doors close.", body);
-                Text(new Rect(66, 422, 500, 58), game.CurrentOffice ? "G: lift badge from behind. E: swipe / attach dolly. Q: release. R: depart once the entire required asset is inside the lift." : "Batteries keep you moving. Heavy cargo slows the doors and burns extra power. You count toward the weight limit.", body);
+                Text(new Rect(66, 332, 500, 80), game.CurrentOffice ? "You are here to steal office equipment. Find the reception access card, open the secured room, and bring the required asset back to the elevator." : game.UseProceduralFloors ? "A sprawling facility. One freight lift. Find remote survey stations, recover valuables, and remember your way back." : "Three floors. One freight lift. Grab whatever looks expensive and get back before the doors close.", body);
+                Text(new Rect(66, 422, 500, 58), game.CurrentOffice ? "Your field notebook is on the table inside the elevator. Read it for controls, access and floor selection." : "Batteries keep you moving. Heavy cargo slows the doors and burns extra power. You count toward the weight limit.", body);
                 if (Button(new Rect(66, 502, 500, 42), "UNIFORM: " + suitNames[suit], WorkerModel.SuitColors[suit]))
                 { suit = (suit + 1) % 4; game.Player.Model.SetColor(suit); }
                 if (Button(new Rect(66, 558, 500, 56), "CLOCK IN  /  START DESCENT", Workshop.Yellow)) game.Begin();
@@ -85,7 +85,7 @@ namespace TheElevator
             Text(new Rect(42, 37, 335, 35), "B" + (game.FloorIndex + 1).ToString("00") + "  /  " +
                 (game.Phase == DescentGame.RunPhase.Transit ? "DESCENDING" : "SALVAGE SHIFT"), heading);
             string location = game.CurrentMap && game.CurrentMap.Ready ? game.Player.InCabin ? "FREIGHT 04 / SAFE ARRIVAL" :
-                game.CurrentMap.NearestRoom(game.Player.transform.position).District + " / ROOM " + game.CurrentMap.NearestRoom(game.Player.transform.position).Id.ToString("000") : FacilityBuilder.Names[game.FloorIndex];
+                game.CurrentMap.NearestRoom(game.Player.transform.position).District + " / ROOM " + game.CurrentMap.NearestRoom(game.Player.transform.position).Id.ToString("000") : "ELEVATOR";
             if(game.CurrentOffice&&!game.Player.InCabin)
             {
                 int room=game.CurrentMap.NearestRoom(game.Player.transform.position).Id;
@@ -118,7 +118,8 @@ namespace TheElevator
             if (game.Load > RunRules.Capacity)
                 Text(new Rect(342, bottom, 600, 27), "OVERLOADED  /  EXTRA POWER + SLOWER DOORS", body);
 
-            Panel(new Rect(width / 2 - 2, height / 2 - 2, 4, 4), Workshop.Cream);
+            if(game.Player.CanInteract && !game.Player.ReadingNotebook) DrawHandCursor(width/2,height/2);
+            else if(!game.Player.ReadingNotebook) Panel(new Rect(width / 2 - 2, height / 2 - 2, 4, 4), Workshop.Cream);
             if (!string.IsNullOrEmpty(game.Player.Prompt) && game.ControlsActive)
             {
                 Panel(new Rect(width / 2 - 330, height / 2 + 65, 660, 39), new Color(0.025f, 0.055f, 0.065f, 0.92f));
@@ -136,6 +137,18 @@ namespace TheElevator
                 Overlay(width, height);
         }
 
+        void DrawHandCursor(float x,float y)
+        {
+            // A compact pointing hand silhouette, independent of font glyph support.
+            Color c=Workshop.Cream;
+            Panel(new Rect(x-4,y-10,5,19),c);
+            Panel(new Rect(x+2,y-1,5,12),c);
+            Panel(new Rect(x+8,y+2,5,10),c);
+            Panel(new Rect(x+14,y+5,4,9),c);
+            Panel(new Rect(x-4,y+8,22,10),c);
+            Panel(new Rect(x-10,y+4,7,8),c);
+            Panel(new Rect(x-1,y+18,15,4),c);
+        }
         void Overlay(float width, float height)
         {
             Panel(new Rect(0, 0, width, height), new Color(0.015f, 0.035f, 0.045f, 0.92f));
@@ -159,4 +172,6 @@ namespace TheElevator
         }
     }
 }
+
+
 

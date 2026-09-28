@@ -152,7 +152,7 @@ MonoBehaviour:
   MapScale: 0
   ProfileOverride: {fileID: 0}
   ContentCatalog: {fileID: 11400000, guid: 065087244d923db40bab72a91f8a52e7, type: 2}
-  UseManualSeed: 1
+  UseManualSeed: 0
   ManualSeed: 104729
 --- !u!4 &1047611761
 Transform:
@@ -174,3 +174,4 @@ SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 1047611761}
+

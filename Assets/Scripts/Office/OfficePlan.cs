@@ -31,6 +31,8 @@ namespace TheElevator.Office
         public OfficeConfig Config;
         public List<OfficeRoomPlan> Rooms = new List<OfficeRoomPlan>();
         public int TargetRoom, SupervisorRoom, TargetType;
+        public int MeetingRoom=-1;
+        public bool DeskBadge;
         public string Hash;
         public List<int> ExtractionRoute;
         public static readonly string[] Departments = { "CLIENT RELATIONS", "ACCOUNTS / PEOPLE", "SYSTEMS ENGINEERING", "CORPORATE RECORDS", "EXECUTIVE SERVICES", "FACILITIES" };
@@ -80,6 +82,17 @@ namespace TheElevator.Office
                 else if (r.Id == plan.TargetRoom) kind = plan.TargetType == 2 ? OfficeRoomKind.Breakroom : plan.TargetType == 0 ? OfficeRoomKind.Server : OfficeRoomKind.Records;
                 plan.Rooms.Add(new OfficeRoomPlan { RoomId = r.Id, Department = department, Kind = kind, Clearance = r.Id == plan.TargetRoom ? 2 : 0 });
             }
+            plan.DeskBadge=(unchecked((uint)map.Recipe.Seed)%2)==0;
+            List<OfficeRoomPlan> eventRooms=plan.Rooms.FindAll(r=>r.RoomId>2&&r.RoomId!=plan.TargetRoom&&!map.Rooms[r.RoomId].IsStair&&map.Rooms[r.RoomId].Layer==0);
+            if(eventRooms.Count>0&&random.Range(100)<55)
+            {
+                OfficeRoomPlan meeting=eventRooms[random.Range(eventRooms.Count)];meeting.Kind=OfficeRoomKind.Conference;plan.MeetingRoom=meeting.RoomId;
+            }
+            if(!plan.Rooms.Exists(r=>r.Kind==OfficeRoomKind.Breakroom&&r.RoomId!=plan.TargetRoom))
+            {
+                OfficeRoomPlan coffee=eventRooms.Find(r=>r.RoomId!=plan.MeetingRoom);
+                if(coffee!=null)coffee.Kind=OfficeRoomKind.Breakroom;
+            }
             foreach (int id in plan.ExtractionRoute) if (map.Rooms[id].Layer != 0) throw new InvalidOperationException("Heavy objective route crosses stairs.");
             float diagonal = new Vector2(plan.TargetBounds.x,plan.TargetBounds.z).magnitude + 0.3f;
             if (map.Recipe.Settings.DoorWidthMillimeters / 1000f < diagonal || map.Recipe.Settings.DoorHeightMillimeters / 1000f < plan.TargetBounds.y + 0.3f)
@@ -88,8 +101,9 @@ namespace TheElevator.Office
             HashSet<int> reachable = new HashSet<int> { 0 }; Queue<int> queue = new Queue<int>(); queue.Enqueue(0);
             while (queue.Count > 0) foreach (int n in map.Neighbors(queue.Dequeue())) if (n != plan.TargetRoom && reachable.Add(n)) queue.Enqueue(n);
             if (!reachable.Contains(plan.SupervisorRoom)) throw new InvalidOperationException("Credential is locked behind its own door.");
-            plan.Hash = StableHash.Of(map.StructureHash + "|office-v1|" + JsonUtility.ToJson(plan));
+            plan.Hash = StableHash.Of(map.StructureHash + "|office-v2-social|" + JsonUtility.ToJson(plan));
             return plan;
         }
     }
 }
+

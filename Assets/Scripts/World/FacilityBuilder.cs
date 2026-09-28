@@ -39,20 +39,10 @@ namespace TheElevator
                 Box("Deck seam", root, -4.1f + i * 0.75f, 0.011f, -6.2f, 0.015f, 0.012f, 7,
                     new Color(0.16f, 0.22f, 0.23f));
             }
-            Box("Console", root, 3.55f, 1.1f, -3.3f, 0.8f, 1.4f, 0.7f, Workshop.Ink);
-            Box("Console face", root, 3.55f, 1.7f, -3.3f, 0.85f, 0.15f, 0.75f, Workshop.Yellow);
-            w.Shape("Departure button", root, new Vector3(3.55f, 1.84f, -3.3f),
-                new Vector3(0.23f, 0.06f, 0.23f), Workshop.Red, PrimitiveType.Cylinder, false);
-            w.Label("R / DESCEND", root, new Vector3(3.55f, 2.25f, -3.3f), 0.06f, Workshop.Cream);
-            w.Label("FREIGHT 04", root, new Vector3(0, 3.24f, -2.23f), 0.1f, Workshop.Yellow);
-            Display = w.Label("WELCOME, REPLACEABLE EMPLOYEE", root, new Vector3(0, 2.7f, -9.82f),
-                0.075f, Workshop.Mint, 180);
-            w.Label("THE ELEVATOR\nGOING DOWN. MOSTLY.", root, new Vector3(0, 1.7f, -9.81f),
-                0.10f, Workshop.Cream, 180);
-            w.Label("MAX LOAD 180 KG\nINCLUDING YOU.", root, new Vector3(-2.7f, 1.9f, -9.8f),
-                0.055f, Workshop.Yellow, 180);
-            w.Label("SAFETY RECORD\n0 DAYS", root, new Vector3(2.7f, 1.9f, -9.8f),
-                0.065f, Workshop.Cream, 180);
+            Box("Floor indicator backing",root,0,3.24f,-2.23f,2.8f,.45f,.08f,Workshop.Ink);
+            Display=w.Label("01",root,new Vector3(0,3.24f,-2.278f),.065f,Workshop.Mint);
+            Transform cabin=w.Group("Passenger freight elevator fittings",root,Vector3.zero);
+            cabin.gameObject.AddComponent<ElevatorCabin>().Build(game,w,LeftDoor,RightDoor);
             for (int i = 0; i < 2; i++)
             {
                 Box("Ceiling lamp", root, -2.4f + i * 4.8f, 3.53f, -6, 0.22f, 0.05f, 3, Workshop.Cream);
@@ -212,3 +202,4 @@ namespace TheElevator
         }
     }
 }
+
