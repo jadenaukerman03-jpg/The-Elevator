@@ -48,6 +48,9 @@ namespace TheElevator.Office
             rig.Build(look,variant);
             float height=1+(variant%5-2)*.025f; transform.localScale=new Vector3(1+(variant%3-1)*.055f,height,1);
         }
+        // Knocked out: the body goes limp and falls where physics takes it.
+        public void Ragdoll(Vector3 impulse){if(rig)rig.Ragdoll(impulse);}
+        public Rigidbody Core{get{return rig?rig.Core:null;}}
         public void Animate(float dt)
         {
             if(!rig) return;

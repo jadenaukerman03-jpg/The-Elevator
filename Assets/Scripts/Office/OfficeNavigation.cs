@@ -4,8 +4,9 @@ namespace TheElevator.Office
 {
     public static class OfficeNavigation
     {
-        // Navigation queries ignore people and movable doors; door passage is reserved separately.
-        const int Mask=~((1<<2)|(1<<8));
+        // Navigation queries ignore people, chairs (employees sit in them), bodies on the floor and movable doors;
+        // door passage is reserved separately.
+        const int Mask=~((1<<PhysicsLayers.Player)|(1<<PhysicsLayers.Employees)|(1<<PhysicsLayers.Seats)|(1<<PhysicsLayers.Ragdolls));
         static readonly Collider[] overlaps=new Collider[32];
         static OfficeEmployee planning;
         public static bool Clear(Vector3 point)

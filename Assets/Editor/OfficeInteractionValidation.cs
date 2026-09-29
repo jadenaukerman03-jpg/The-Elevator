@@ -23,6 +23,7 @@ namespace TheElevator.Editor
         static OfficeEmployee rifleman,brute,victim;
         static int shotsBefore,swingsBefore,blastsBefore;
         static float lowestHealth;
+        static WorkerController teammate;
         static OfficeInteractionValidation(){EditorApplication.update+=Tick;Application.logMessageReceived+=Log;}
         public static void Run()
         {
@@ -232,6 +233,15 @@ namespace TheElevator.Editor
                     Transform gun=rifleman.transform;
                     OfficeTools.Capture(office.transform,"TestResults/Office/armed-employee.png",gun.position+gun.forward*1.8f+gun.right*.9f+Vector3.up*1.5f,gun.position+Vector3.up*1.1f);
                     victim.Damage(1000,victim.transform.position+Vector3.forward,0);Check(victim.Dead&&!victim.Chasing,"Employees can be knocked out");
+                    Check(victim.Robot.Core&&!victim.Robot.Core.isKinematic,"A knocked-out employee goes ragdoll");
+                    // Weapon odds: once furious, each further offence is 2% rifle, 0.5% bazooka.
+                    Check(Mathf.Approximately(OfficeEmployee.RifleChance,.02f)&&Mathf.Approximately(OfficeEmployee.BazookaChance,.005f)
+                        &&OfficeEmployee.WeaponFor(.004)==Arms.Bazooka&&OfficeEmployee.WeaponFor(.02)==Arms.Rifle&&OfficeEmployee.WeaponFor(.03)==Arms.None,"Weapon odds are 2% rifle and 0.5% bazooka");
+                    // Chairs are solid to players (not to employees), and people at work stay solid too.
+                    OfficeSeat chair=OfficeSeat.All.Find(s=>s&&s.GetComponent<BoxCollider>());
+                    Check(chair&&chair.gameObject.layer==PhysicsLayers.Seats&&!Physics.GetIgnoreLayerCollision(PhysicsLayers.Player,PhysicsLayers.Seats)&&Physics.GetIgnoreLayerCollision(PhysicsLayers.Employees,PhysicsLayers.Seats),"Chairs block players but not employees");
+                    OfficeEmployee sitter=office.Employees.Find(e=>!e.Dead&&e.Robot.Seated&&e.AtStation);
+                    Check(sitter&&sitter.Motor.enabled,"A seated employee is solid");
                     started=Time.time;stage=8;return;
                 }
                 if(stage==8)
@@ -241,10 +251,37 @@ namespace TheElevator.Editor
                     Transform body=victim.transform;
                     Vector3 inward=office.Map.Center(office.Map.NearestRoom(body.position))-body.position;inward.y=0;inward=inward.sqrMagnitude>.01f?inward.normalized:Vector3.forward;
                     OfficeTools.Capture(office.transform,"TestResults/Office/knocked-out.png",body.position+inward*2.2f+Vector3.up*1.5f,body.position+Vector3.up*.2f);
+                    Check(victim.Robot.Core.position.y-body.position.y<.45f,"The ragdoll ends up lying on the floor (pelvis "+(victim.Robot.Core.position.y-body.position.y).ToString("F2")+" m up)");
+                    // Pay shares: one body of four left behind costs 25%, one of three 33%.
+                    Check(Mathf.Approximately(DescentGame.BodyCut(4,1),.25f)&&Mathf.Abs(DescentGame.BodyCut(3,1)-1/3f)<.001f&&DescentGame.BodyCut(4,0)==0,"A body left behind costs its share of the pay");
+                    SalvageItem sample=game.Items.Find(i=>i&&i.Value>=100);int worth=sample.Value;sample.Deduct(.25f);
+                    Check(sample.Value==Mathf.RoundToInt(worth*.75f),"Recovered items lose the missing share");
+                    // A teammate goes down: they ragdoll, the shift goes on, and the body can be carried to the lift.
+                    teammate=game.SpawnTeammate(game.Player.transform.position+game.Player.transform.right*1.2f);
+                    teammate.Damage(1000,teammate.transform.position+Vector3.forward,4);
+                    Check(teammate.Down&&teammate.Model.Ragdolled&&game.Phase!=DescentGame.RunPhase.Lost,"A downed teammate ragdolls and the shift goes on");
+                    Check(Mathf.Approximately(game.BodyShortfall(),.5f),"Their body away from the lift is half the pay for a crew of two");
+                    started=Time.time;stage=9;return;
+                }
+                if(stage==9)
+                {
+                    game.Player.HealForValidation();
+                    if(Time.time-started<1f)return;
+                    Check(game.Player.CarryBody(teammate)&&teammate.CarriedBy==game.Player,"The body can be picked up");
+                    game.Player.Teleport(new Vector3(0,.08f,-6.5f));
+                    started=Time.time;stage=10;return;
+                }
+                if(stage==10)
+                {
+                    if(Time.time-started<1f)return;
+                    Check(DescentGame.InCabin(teammate.BodyPosition)&&game.BodyShortfall()==0,"Carried into the lift, the body costs nothing");
+                    game.Player.DropBody();
+                    Check(!teammate.CarriedBy,"The body can be put down");
                     game.Player.Teleport(brute.transform.position+brute.transform.forward*3);game.Player.HealForValidation();
                     game.Player.Damage(1000,game.Player.transform.position+Vector3.forward,0);
                     Check(game.Player.Down&&game.Phase==DescentGame.RunPhase.Lost,"With nobody left standing, being knocked out ends the shift");
-                    Finish(true,"OFFICE INTERACTION PASS: visible first-person hands, multiple grip profiles, selected equipment only, nearby pickup, gentle tap, capped charged throw, weight scaling, charge cancellation, two-room meeting with presenter, calm meeting entry, one anger level per bump, shoving, extinguisher pickup/spray/charge/empty/push, hand clear of nozzle, sticky blinding foam and instant fury, chase, three voice tones, hallway chat, sit and stand, one phrase per bubble, owner-only desk theft (award 3, computer 5), thrown-item damage, cooling to 4 and never lower, snapping at 20, inaccurate rifle fire, punches, bazooka blast, knockouts, shift ends at 0 health.");
+                    Check(game.Player.Model.Ragdolled,"The player ragdolls too");
+                    Finish(true,"OFFICE INTERACTION PASS: visible first-person hands, multiple grip profiles, selected equipment only, nearby pickup, gentle tap, capped charged throw, weight scaling, charge cancellation, two-room meeting with presenter, calm meeting entry, one anger level per bump, shoving, extinguisher pickup/spray/charge/empty/push, hand clear of nozzle, sticky blinding foam and instant fury, chase, three voice tones, hallway chat, sit and stand, one phrase per bubble, owner-only desk theft (award 3, computer 5), thrown-item damage, cooling to 4 and never lower, snapping at 20, inaccurate rifle fire, punches, bazooka blast, knockouts, shift ends at 0 health, 2%/0.5% weapon odds, solid chairs and seated people, ragdolls, body carrying and pay shares.");
                 }
             }
             catch(Exception error){Finish(false,error.ToString());}

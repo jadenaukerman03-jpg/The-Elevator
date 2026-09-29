@@ -41,15 +41,17 @@ There are no suspicion or incident meters. Every employee has their own anger. I
 | Throw something at them (also 10 damage) | at least 5, then +5 |
 | Spray them with extinguisher foam | at least 5, then +5 every 1.5 s of spraying |
 
-Only the person you wronged gets upset; bystanders stay calm. Walking, running or sitting near people is fine. Keep walking into a standing employee and you shove them; afterwards they stop, glare at you and tell you off. At 5 they get up and come after you, yelling about what you did. Break line of sight for 10 seconds and they settle to 4, still on edge; anger never goes back to normal on its own. At 20 they snap: they hunt you for good, shove and punch (10 damage), and each new offence is a 10% chance they pull an assault rifle (24 damage a round, deliberately inaccurate) or a 2% chance of a bazooka (a 10 m blast, up to 100 damage, that hurts employees too).
+Only the person you wronged gets upset; bystanders stay calm. Walking, running or sitting near people is fine. Keep walking into a standing employee and you shove them; afterwards they stop, glare at you and tell you off. At 5 they get up and come after you, yelling about what you did. Break line of sight for 10 seconds and they settle to 4, still on edge; anger never goes back to normal on its own. Once someone is furious, every further offence is a 2% chance they pull an assault rifle (24 damage a round, deliberately inaccurate) and a 0.5% chance of a bazooka (a 10 m blast, up to 100 damage, that hurts employees too); armed, they hunt you for good. At 20 they snap anyway: they hunt you for good and shove and punch (10 damage).
 
-You have 100 health; the lift is safe. At 0 you spectate a teammate who is still standing, or, with nobody left, the shift ends. Employees have 200 health and can be knocked out.
+You have 100 health; the lift is safe. Knocked out, you go ragdoll where you fall and spectate a teammate who is still standing, or, with nobody left, the shift ends. Each crew member is worth an equal share of the pay: a teammate can carry your body back to the lift (look at it and press E), and if the lift leaves without it, everything recovered is worth that share less (one body of four: 25%; one of three: 33%). Downed crew come to in the lift on the next floor. Employees have 200 health and go ragdoll when knocked out.
+
+Chairs are solid, and so are people sitting or standing at work: you walk around them, not through them.
 
 Most floors hide a boardroom: a dead-end room two rooms long with one door, a long table ringed by mostly occupied chairs, and a presenter at the far end pointing a stick at the quarterly chart. You may walk in and listen; nobody minds unless you bump into them.
 
 ### Office talk
 
-Employees speak a made-up language in their own voices: you hear gibberish, and a flat speech bubble above their head (always facing you) shows what they mean, one phrase at a time. Their voice follows their anger: calm at levels 1-2, tense and upset at 3-4, and yelling at 5, when the bubble turns red and the words get rude (never swearing). What they say depends on what you did and how angry they are, with a large pool of lines for each. Two colleagues passing in a hallway either walk on or, half the time, stop for a proper chat about reports, printers, lunch plans and so on. In the boardroom the presenter's words appear above their head.
+Employees murmur a soft made-up language in their own voices: you hear gibberish, and a flat speech bubble above their head (always facing you) shows what they mean, one phrase at a time. Their voice follows their anger: calm at levels 1-2, tense and upset at 3-4, and yelling at 5, when the bubble turns red and the words get rude (never swearing). What they say depends on what you did and how angry they are, with a large pool of lines for each. Two colleagues passing in a hallway either walk on or, half the time, stop for a proper chat about reports, printers, lunch plans and so on. In the boardroom the presenter's words appear above their head.
 
 ### Sitting
 

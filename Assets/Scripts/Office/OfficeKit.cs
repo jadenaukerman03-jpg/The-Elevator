@@ -159,6 +159,9 @@ namespace TheElevator.Office
             A.Box(c,"Lumbar back",new Vector3(0,.705f,-.24f),new Vector3(.59f,.58f,.17f),A.Upholstery);
             for(int s=-1;s<=1;s+=2) A.Box(c,"Chair armrest",new Vector3(s*.31f,.595f,.015f),new Vector3(.065f,.05f,.4f),A.Dark);
             c.gameObject.AddComponent<OfficeSeat>();
+            // Solid to players (you can't walk through a chair); employees ignore this layer so they can sit in it.
+            BoxCollider solid=c.gameObject.AddComponent<BoxCollider>();solid.center=new Vector3(0,.48f,-.04f);solid.size=new Vector3(.62f,.96f,.62f);
+            c.gameObject.layer=PhysicsLayers.Seats;
         }
         public void Paperwork(Transform t,Vector3 p)
         {

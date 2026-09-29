@@ -107,7 +107,7 @@ namespace TheElevator.Office
         void Update()
         {
             if(!Office.Game||!Office.Game.ControlsActive)return;
-            if(Dead){Fallen();return;}
+            if(Dead)return;
             float distance=Vector3.Distance(Office.Game.Player.transform.position,transform.position);
             if(Time.time>=nextThink)
             {
@@ -154,7 +154,8 @@ namespace TheElevator.Office
             else if(Travelling)Walk();
             else if(Station&&AtStation&&!Chasing)
             {
-                motor.enabled=false;Robot.Seated=Station.Seated;Robot.Activity=Station.Activity;
+                // The body stays solid at work, seated or standing: nobody walks through a person.
+                motor.enabled=true;Robot.Seated=Station.Seated;Robot.Activity=Station.Activity;
                 if(Station.Coffee)TickCoffee(Time.deltaTime);
                 else if(Station.EquipmentMissing){State="Workstation missing";Robot.Activity=OfficeTask.Reading;}
                 else State=Station.Activity==OfficeTask.Meeting?"Discussing quarterly targets":"Working";
@@ -239,7 +240,7 @@ namespace TheElevator.Office
         {
             if(!Station)return;
             // No teleport through scenery: only snap the final few centimetres of an already traversed route.
-            motor.enabled=false;transform.position=Station.transform.position;transform.rotation=Station.transform.rotation;
+            transform.position=Station.transform.position;transform.rotation=Station.transform.rotation;Physics.SyncTransforms();
             Robot.Seated=Station.Seated;Robot.Activity=Station.Activity;CompletedTrips++;recoveryAttempts=0;
             nextTask=Time.time+(Station==HomeStation?35+(float)random.NextDouble()*65:8+(float)random.NextDouble()*10);
         }

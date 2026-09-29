@@ -47,6 +47,12 @@ namespace TheElevator
             rig.SetFirstPerson(firstPerson);
         }
 
+        // Out cold: the whole body shows (even in first person) and goes limp.
+        public void Ragdoll(Vector3 impulse) { SetView(false, false); rig.Ragdoll(impulse); }
+        public bool Ragdolled { get { return rig && rig.Ragdolled; } }
+        public Rigidbody Core { get { return rig ? rig.Core : null; } }
+        public void Hold(bool held) { if (rig) rig.Hold(held); }
+
         public void Animate(float speed, bool carrying, float dt, bool seated = false)
         {
             rig.Animate(dt, new BeanPose { Speed = speed, Carrying = carrying, Seated = seated, ElbowBend = -12 });

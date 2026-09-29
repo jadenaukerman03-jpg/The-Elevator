@@ -343,7 +343,8 @@ namespace TheElevator
 
         public void Animate(float dt, BeanPose pose)
         {
-            if (!pelvis) return;
+            // A ragdoll is driven by physics, not animation.
+            if (!pelvis || Ragdolled) return;
             // Own clock: idle motion runs from the frame times it is given, so it also plays in paused previews and edit-mode renders.
             clock += Mathf.Min(dt, .1f);
             // Smoothed ground speed; cadence follows stride length so fast running lengthens strides instead of flailing.

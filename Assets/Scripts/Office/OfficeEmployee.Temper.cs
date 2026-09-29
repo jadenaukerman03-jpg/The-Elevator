@@ -8,10 +8,11 @@ namespace TheElevator.Office
     // past 5. A bump adds 1. Taking an award or another thing off their desk puts them at 3 at least; taking their
     // computer, throwing something at them or foaming them puts them at 5 at least; repeating those adds 2 or 5 more.
     // Anger never cools on its own, with one exception: a furious employee who loses sight of the player for a while
-    // settles to 4 (on edge). At 20 they snap: they hunt the player for good and swing at them, and some pull a weapon.
+    // settles to 4 (on edge). Once furious, every further offence is a 2% chance they pull a rifle and a 0.5% chance of a
+    // bazooka, and then they hunt the player. At 20 they snap anyway: they hunt the player for good and swing at them.
     public sealed partial class OfficeEmployee
     {
-        public const float SnapPoint = 20, MaxHealth = 200, LoseInterest = 10;
+        public const float SnapPoint = 20, MaxHealth = 200, LoseInterest = 10, RifleChance = .02f, BazookaChance = .005f;
         public float Anger { get; private set; } = 1;
         public int AngerLevel { get { return Mathf.Clamp((int)Anger, 1, 5); } }
         public bool Snapped { get { return Anger >= SnapPoint; } }
@@ -20,7 +21,8 @@ namespace TheElevator.Office
         public bool Dead { get; private set; }
         public Arms Weapon { get; private set; }
         string lastLine;
-        float lastSawPlayer = -999, lastFoamOffence = -10, nextSpotted, nextSwing, nextShot, swingUntil, fallen;
+        float lastSawPlayer = -999, lastFoamOffence = -10, nextSpotted, nextSwing, nextShot, swingUntil;
+        Vector3 lastHit;
         int burst;
         Transform weapon;
         bool armsBusy;
@@ -50,23 +52,31 @@ namespace TheElevator.Office
         {
             if (Dead) return;
             OfficeDialogue.Tier before = OfficeDialogue.TierFor(Anger);
-            bool wasSnapped = Snapped;
+            bool wasSnapped = Snapped, wasFurious = AngerLevel >= 5;
             float minimum = Minimum(grievance);
             Anger = Anger < minimum ? minimum : Anger + Weight(grievance);
             Complaint = grievance;
             attentionUntil = Time.time + 5;
             SawPlayer();
             if (Office.Game) { LastObservedPosition = Office.Game.Player.transform.position; Office.Questioner = this; }
-            // Past the snapping point every new offence is another chance they reach for something in their desk.
-            if (Snapped && Weapon == Arms.None && Office.Game)
+            // Making someone who is already furious angrier is a small chance they reach for something in their desk.
+            if (wasFurious && Weapon == Arms.None && Office.Game)
             {
-                double roll = random.NextDouble();
-                if (roll < .02) { Arm(Arms.Bazooka); Say(OfficeDialogue.Pick(OfficeDialogue.DrawBazooka, random, ref lastLine)); return; }
-                if (roll < .12) { Arm(Arms.Rifle); Say(OfficeDialogue.Pick(OfficeDialogue.DrawRifle, random, ref lastLine)); return; }
+                Arms drawn = WeaponFor(random.NextDouble());
+                if (drawn != Arms.None)
+                {
+                    // Armed means out for revenge: they hunt the player and never calm down.
+                    Anger = Mathf.Max(Anger, SnapPoint);
+                    Arm(drawn);
+                    Say(OfficeDialogue.Pick(drawn == Arms.Bazooka ? OfficeDialogue.DrawBazooka : OfficeDialogue.DrawRifle, random, ref lastLine));
+                    return;
+                }
             }
             if (opening != null) Say(opening);
             else if (!Speaking || OfficeDialogue.TierFor(Anger) != before || (Snapped && !wasSnapped)) Say(OfficeDialogue.Reaction(grievance, Anger, random, ref lastLine));
         }
+
+        public static Arms WeaponFor(double roll) { return roll < BazookaChance ? Arms.Bazooka : roll < BazookaChance + RifleChance ? Arms.Rifle : Arms.None; }
 
         public void Bump() { Offend(Grievance.Bump); }
 
@@ -102,6 +112,7 @@ namespace TheElevator.Office
             if (Dead || amount <= 0) return;
             Health = Mathf.Max(0, Health - amount);
             Vector3 away = transform.position - from; away.y = 0;
+            lastHit = away.sqrMagnitude > 1e-4f ? away.normalized * Mathf.Max(1.5f, knock) : Vector3.zero;
             if (knock > 0 && away.sqrMagnitude > 1e-4f && !Robot.Seated) Impulse(away.normalized * knock);
             if (Health <= 0) { Die(); return; }
             if (!Speaking) Say(OfficeDialogue.Pick(OfficeDialogue.Hurt, random, ref lastLine));
@@ -127,18 +138,10 @@ namespace TheElevator.Office
                 weapon = null;
             }
             if (Cup) { Destroy(Cup.gameObject); Cup = null; }
+            // Limp: the body falls wherever physics takes it and stays there.
+            Robot.Ragdoll(lastHit + Vector3.up * 1.2f);
         }
 
-        // Keeled over: tip backwards onto the floor over half a second, then lie still.
-        void Fallen()
-        {
-            if (fallen >= 1) return;
-            fallen = Mathf.Min(1, fallen + Time.deltaTime / .5f);
-            float t = Mathf.SmoothStep(0, 1, fallen);
-            Robot.transform.localRotation = Quaternion.Euler(-88 * t, 0, 0);
-            Robot.transform.localPosition = Vector3.up * .22f * t;
-            Robot.Animate(Time.deltaTime);
-        }
 
         // ---- Seeing the player, cooling off ----
         void SawPlayer() { lastSawPlayer = Time.time; }
@@ -300,8 +303,9 @@ namespace TheElevator.Office
                 voice = gameObject.AddComponent<AudioSource>(); voice.playOnAwake = false; voice.spatialBlend = 1; voice.dopplerLevel = 0;
                 voice.rolloffMode = AudioRolloffMode.Linear; voice.minDistance = 1.5f;
             }
-            voice.maxDistance = SpeechTone == OfficeVoice.Tone.Yelling ? 30 : 16;
-            voice.volume = SpeechTone == OfficeVoice.Tone.Calm ? .6f : SpeechTone == OfficeVoice.Tone.Upset ? .8f : 1f;
+            // Chatter stays in the background; anger carries further and louder.
+            voice.maxDistance = SpeechTone == OfficeVoice.Tone.Yelling ? 30 : SpeechTone == OfficeVoice.Tone.Upset ? 18 : 12;
+            voice.volume = SpeechTone == OfficeVoice.Tone.Calm ? .45f : SpeechTone == OfficeVoice.Tone.Upset ? .75f : 1f;
             voice.pitch = 1;
             voice.Stop();
             string phrase = Speech; OfficeVoice.Tone tone = SpeechTone; float pitch = Voice; int speaker = EmployeeId;

@@ -321,6 +321,13 @@ namespace TheElevator
             }
             RecountCargo();
             if (!RunRules.CanDepart(Power, Load)) { Finish(false, "Power failure. Carry fewer valuables or connect more batteries."); return; }
+            float cut = BodyShortfall();
+            if (cut > 0)
+            {
+                foreach (SalvageItem item in Items) if (IsCargo(item)) item.Deduct(cut);
+                Notify("A teammate was left behind. Everything recovered is worth " + Mathf.RoundToInt(cut * 100) + "% less.");
+                RecountCargo();
+            }
             Power -= RunRules.DepartureCost(Load);
             if (Player.Held)
             {
@@ -350,9 +357,30 @@ namespace TheElevator
             Notify("Descending. Please keep all regrets inside the cabin.");
         }
 
+        // ---- Crew and bodies ----
+        // Every crew member is worth an equal share of the company's pay. A downed teammate whose body is not
+        // inside the lift when it leaves costs the crew their share: one of four, 25%; one of three, 33%.
+        public static float BodyCut(int crew, int bodiesLeft) { return crew <= 0 ? 0 : Mathf.Clamp01(bodiesLeft / (float)crew); }
+        public WorkerController[] Crew { get { return FindObjectsByType<WorkerController>(FindObjectsSortMode.None); } }
+        public float BodyShortfall()
+        {
+            WorkerController[] crew = Crew; int left = 0;
+            foreach (WorkerController member in crew) if (member.Down && !InCabin(member.BodyPosition)) left++;
+            return BodyCut(crew.Length, left);
+        }
+        // A second crew member without input or camera, for checks until multiplayer exists.
+        public WorkerController SpawnTeammate(Vector3 at)
+        {
+            WorkerController mate = new GameObject("Teammate").AddComponent<WorkerController>();
+            mate.Remote = true; mate.Initialize(this, workshop); mate.Teleport(at);
+            return mate;
+        }
+
         void Arrive()
         {
             FloorIndex = Mathf.Clamp(destinationFloor - 1,0,49);
+            // Downed crew come to in the lift on the next floor.
+            foreach (WorkerController member in Crew) if (member.Down) member.Revive(new Vector3(member == Player ? 0 : 1.2f, 0.08f, -6.5f));
             if (UseProceduralFloors) { CurrentMap = null; StartCoroutine(GenerateFloor(false, null)); return; }
             floor = builder.Floor(FloorIndex, seed);
             Clock = RunRules.FloorSeconds;

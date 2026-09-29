@@ -9,6 +9,8 @@ namespace TheElevator
         public int Value { get; private set; }
         int undamagedValue;
         public void ApplyCondition(float condition) { Value = Mathf.RoundToInt(undamagedValue * Mathf.Clamp(condition,0.25f,1)); }
+        // Pay cut (a teammate's body left behind): permanently worth this fraction less.
+        public void Deduct(float fraction) { float keep = 1 - Mathf.Clamp01(fraction); Value = Mathf.RoundToInt(Value * keep); undamagedValue = Mathf.RoundToInt(undamagedValue * keep); }
         public bool IsBattery { get; private set; }
         public bool IsHeld { get; private set; }
         public Rigidbody Body { get; private set; }

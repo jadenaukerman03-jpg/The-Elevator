@@ -39,6 +39,13 @@ namespace TheElevator
         public float Health { get; private set; } = MaxHealth;
         public bool Down { get; private set; }
         public WorkerController Spectating { get; private set; }
+        // Another crew member controlled elsewhere: no input, camera or hands here.
+        public bool Remote { get; set; }
+        // Bodies: a downed player lies where they fell until a teammate carries them to the lift.
+        public WorkerController CarriedBody { get; private set; }
+        public WorkerController CarriedBy { get; private set; }
+        public Vector3 BodyPosition { get { return Model && Model.Core ? Model.Core.position : transform.position; } }
+        WorkerController bodyTarget;
         float hurtFlash;
         static Texture2D foamBlot;
         // Seated view: a little lower than standing, so sitting reads as sitting.
@@ -82,7 +89,8 @@ namespace TheElevator
             View.fieldOfView = 60;
             View.backgroundColor = Workshop.Ink;
             View.clearFlags = CameraClearFlags.SolidColor;
-            View.gameObject.AddComponent<AudioListener>();
+            if (!Remote) View.gameObject.AddComponent<AudioListener>();
+            else { View.enabled = false; View.tag = "Untagged"; Hands.gameObject.SetActive(false); }
             flashlight = View.gameObject.AddComponent<Light>();
             flashlight.type = LightType.Spot; flashlight.range = 24; flashlight.spotAngle = 72;
             flashlight.intensity = .6f; flashlight.color = new Color(1,0.94f,0.80f); flashlight.shadows = LightShadows.Soft;
@@ -101,6 +109,7 @@ namespace TheElevator
 
         void Update()
         {
+            if (Remote) return;
             if (!game || !game.ControlsActive)
             {
                 ChargingThrow=false;ThrowCharge=0;
@@ -130,6 +139,7 @@ namespace TheElevator
             Stamina = infiniteStamina ? 1f : Mathf.Clamp01(Stamina + Time.deltaTime * (MovingFast ? -0.23f : 0.17f));
             float speed = Crouched ? 1.85f : MovingFast ? 6.8f : 4.1f;
             if (Held) speed *= RunRules.CarrySpeed(Held.Mass);
+            if (CarriedBody) speed *= .7f;
             if (game.CurrentOffice && game.CurrentOffice.Transported) speed *= 0.48f;
             bool wet = game.CurrentMap ? game.CurrentMap.IsWet(transform.position) : game.FloorIndex == 1 && transform.position.z > 3f;
             if (wet) speed *= 0.72f;
@@ -163,6 +173,8 @@ namespace TheElevator
                 if(elevatorButton){elevatorButton.Press();}
                 else if(notebook){notebook.Open();}
                 else if (game.CurrentOffice && game.CurrentOffice.InteractPressed()) { }
+                else if (CarriedBody) DropBody();
+                else if (bodyTarget) CarryBody(bodyTarget);
                 else if (Held) Drop(false);
                 else if (terminal) terminal.Use(game);
                 else if (Target) PickUp(Target);
@@ -180,7 +192,7 @@ namespace TheElevator
 
         void UpdateTarget()
         {
-            Target = null;CanInteract=false;elevatorButton=null;notebook=null;seatTarget=null;
+            Target = null;CanInteract=false;elevatorButton=null;notebook=null;seatTarget=null;bodyTarget=null;
             terminal = null;
             Prompt = "";
             if (Held)
@@ -191,6 +203,9 @@ namespace TheElevator
             bool looking = Physics.Raycast(ray, out RaycastHit hit, 2.8f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
             if (looking)
             {
+                // A downed teammate's body can be picked up and carried.
+                WorkerController fallen=hit.collider.GetComponentInParent<WorkerController>();
+                if(fallen&&fallen!=this&&fallen.Down&&!fallen.CarriedBy&&!Held&&!CarriedBody){bodyTarget=fallen;CanInteract=true;Prompt="Carry teammate";return;}
                 ElevatorButton floorButton=hit.collider.GetComponentInParent<ElevatorButton>();
                 if(floorButton){if(floorButton.Available){elevatorButton=floorButton;CanInteract=true;}return;}
                 notebook=Held?null:hit.collider.GetComponentInParent<FieldNotebook>();if(notebook){CanInteract=true;Prompt="Field notebook";return;}
@@ -313,12 +328,52 @@ namespace TheElevator
         void GoDown()
         {
             Down = true;
-            Drop(true);
+            if (Seat) LeaveSeat();
+            Drop(true); DropBody();
             ChargingThrow = false; ThrowCharge = 0; Motion = Vector3.zero;
-            foreach (WorkerController other in FindObjectsByType<WorkerController>(FindObjectsSortMode.None))
+            motor.enabled = false;
+            // Limp: the body falls where the last hit sends it and stays there until someone carries it.
+            Model.Ragdoll(knockback * .5f + Vector3.up);
+            knockback = Vector3.zero;
+            foreach (WorkerController other in game.Crew)
                 if (other != this && !other.Down) { Spectating = other; break; }
+            if (Remote) { if (Spectating) game.Notify("A teammate is down! Carry their body back to the lift."); return; }
             if (Spectating) game.Notify("You're out cold. Spectating a teammate.");
             else game.Finish(false, "You were knocked out by an angry coworker.");
+        }
+
+        public bool CarryBody(WorkerController body)
+        {
+            if (!body || body == this || !body.Down || body.CarriedBy || Held || CarriedBody || Down) return false;
+            if (Vector3.Distance(transform.position + Vector3.up, body.BodyPosition) > 3) return false;
+            CarriedBody = body; body.CarriedBy = this; body.Model.Hold(true);
+            return true;
+        }
+
+        public void DropBody()
+        {
+            if (!CarriedBody) return;
+            CarriedBody.Model.Hold(false); CarriedBody.CarriedBy = null; CarriedBody = null;
+        }
+
+        // The carried body hangs in front of the carrier, limbs swinging.
+        void FixedUpdate()
+        {
+            if (!CarriedBody || !CarriedBody.Model.Core || !View) return;
+            Rigidbody core = CarriedBody.Model.Core;
+            Vector3 at = transform.position + Vector3.up * .85f + transform.forward * .7f;
+            core.MovePosition(Vector3.Lerp(core.position, at, .4f));
+            core.MoveRotation(Quaternion.Slerp(core.rotation, transform.rotation * Quaternion.Euler(80, 0, 0), .3f));
+        }
+
+        // Back on your feet (next floor): a fresh body in the lift.
+        public void Revive(Vector3 at)
+        {
+            if (CarriedBy) CarriedBy.DropBody();
+            Down = false; Spectating = null; Health = MaxHealth; FaceFoam = 0; hurtFlash = 0;
+            Model.Apply(Model.Loadout);
+            motor.enabled = true;
+            Teleport(at);
         }
 
         // Soft white blots over the view plus a milky wash: the screen equivalent of foam on your face.
@@ -435,7 +490,8 @@ namespace TheElevator
                 View.transform.LookAt(transform.position + Vector3.up * 1.0f);
                 return;
             }
-            Model.SetView(firstPerson,Crouched);
+            if (Remote) return;
+            if (!Down) Model.SetView(firstPerson,Crouched);
             flashlight.enabled = flashlightOn;
             View.rect = new Rect(0, 0, 1, 1);
             if (game.Paused) return;
@@ -449,6 +505,13 @@ namespace TheElevator
                     Transform target = Spectating.transform;
                     View.transform.position = target.position + Vector3.up * 1.9f - target.forward * 3.2f;
                     View.transform.LookAt(target.position + Vector3.up * 1.2f);
+                }
+                else
+                {
+                    // Nobody left to watch: look down at your own body.
+                    Vector3 body = BodyPosition;
+                    View.transform.position = Vector3.Lerp(View.transform.position, body + new Vector3(0, 2.6f, -1.6f), Time.deltaTime * 2);
+                    View.transform.LookAt(body);
                 }
                 return;
             }
