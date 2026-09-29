@@ -33,6 +33,13 @@ namespace TheElevator
         public TheElevator.Office.OfficeSeat Seat { get; private set; }
         // Extinguisher foam on the face (0 clear, 1 covered). It smears your view and wears off over a few seconds.
         public float FaceFoam { get; private set; }
+        // Health: coworkers who snap can hurt you. At zero you are out: you spectate a teammate who is still
+        // standing, or, with nobody left, the shift ends.
+        public const float MaxHealth = 100;
+        public float Health { get; private set; } = MaxHealth;
+        public bool Down { get; private set; }
+        public WorkerController Spectating { get; private set; }
+        float hurtFlash;
         static Texture2D foamBlot;
         // Seated view: a little lower than standing, so sitting reads as sitting.
         public const float SeatedEyeHeight=1.22f;
@@ -101,7 +108,7 @@ namespace TheElevator
                 {yaw+=Input.GetAxisRaw("Mouse X")*2.1f;pitch=Mathf.Clamp(pitch-Input.GetAxisRaw("Mouse Y")*1.8f,-35,65);}
                 return;
             }
-            if(ReadingNotebook)return;
+            if(ReadingNotebook||Down)return;
             damageCooldown -= Time.deltaTime;
             FaceFoam = Mathf.MoveTowards(FaceFoam, 0, Time.deltaTime / 7f);
             yaw += Input.GetAxisRaw("Mouse X") * 2.1f;
@@ -278,6 +285,33 @@ namespace TheElevator
 
         public void Foam(float amount) { FaceFoam = Mathf.Clamp01(FaceFoam + amount); }
 
+        // Punches, bullets and blasts. The lift is safe: nothing hurts you inside it.
+        public void Damage(float amount, Vector3 from, float knock)
+        {
+            if (Down || !game || !game.ControlsActive || InCabin) return;
+            Vector3 away = transform.position - from; away.y = 0;
+            if (knock > 0 && away.sqrMagnitude > 1e-4f) knockback = away.normalized * knock;
+            if (amount <= 0) return;
+            if (Seat) LeaveSeat();
+            Health = Mathf.Max(0, Health - amount);
+            hurtFlash = Mathf.Clamp01(hurtFlash + .35f + amount / 60f);
+            game.Sound.Play(70, .18f, .16f);
+            if (Health <= 0) GoDown();
+        }
+
+        public void HealForValidation() { Health = MaxHealth; hurtFlash = 0; }
+
+        void GoDown()
+        {
+            Down = true;
+            Drop(true);
+            ChargingThrow = false; ThrowCharge = 0; Motion = Vector3.zero;
+            foreach (WorkerController other in FindObjectsByType<WorkerController>(FindObjectsSortMode.None))
+                if (other != this && !other.Down) { Spectating = other; break; }
+            if (Spectating) game.Notify("You're out cold. Spectating a teammate.");
+            else game.Finish(false, "You were knocked out by an angry coworker.");
+        }
+
         // Soft white blots over the view plus a milky wash: the screen equivalent of foam on your face.
         void DrawFaceFoam()
         {
@@ -354,6 +388,12 @@ namespace TheElevator
         {
             if(!game||!game.ControlsActive||ReadingNotebook||PreviewAvatar)return;
             DrawFaceFoam();
+            if(hurtFlash>.01f&&Event.current.type==EventType.Repaint)
+            {
+                // A red flash when you get hurt.
+                Color old=GUI.color;GUI.color=new Color(.85f,.05f,.05f,hurtFlash*.45f);
+                GUI.DrawTexture(new Rect(0,0,Screen.width,Screen.height),Texture2D.whiteTexture);GUI.color=old;
+            }
             if(!Held)return;
             // Throw strength and item usage share one ring around the cursor.
             if(ChargingThrow){CursorGauge.Draw(ThrowCharge,Color.Lerp(new Color(1,.85f,.3f),new Color(1,.3f,.12f),ThrowCharge));return;}
@@ -390,6 +430,19 @@ namespace TheElevator
             flashlight.enabled = flashlightOn;
             View.rect = new Rect(0, 0, 1, 1);
             if (game.Paused) return;
+            hurtFlash = Mathf.MoveTowards(hurtFlash, 0, Time.deltaTime * 1.2f);
+            if (Down)
+            {
+                // Out cold: watch a teammate who is still on their feet over their shoulder.
+                if (Hands) Hands.gameObject.SetActive(false);
+                if (Spectating && !Spectating.Down)
+                {
+                    Transform target = Spectating.transform;
+                    View.transform.position = target.position + Vector3.up * 1.9f - target.forward * 3.2f;
+                    View.transform.LookAt(target.position + Vector3.up * 1.2f);
+                }
+                return;
+            }
             Quaternion rotation = Quaternion.Euler(pitch, yaw, 0);
             if(Seat)
             {

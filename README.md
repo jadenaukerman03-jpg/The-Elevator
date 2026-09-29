@@ -31,13 +31,25 @@ Office staff dress for their job: associate, receptionist (headset), technician 
 
 ### Anger and the boardroom
 
-There are no suspicion or incident meters. Every employee has their own anger, starting calm (1) and rising to furious (5); read it on their face: a resting face, then annoyed, irritated, angry, and finally red-faced and shouting. Walking, running or sitting near people does not upset them. Walking into someone does: each bump raises that one employee's anger by one level. Keep walking into a standing employee and you shove them out of the way; afterwards they stop for a moment, glare at you and tell you off. Spraying anyone with extinguisher foam makes them furious (level 5) straight away. At level 5 an employee gets up from whatever they were doing and comes after you, yelling about what you did, until they cool down. Being seen carrying stolen property still makes them suspicious. Anger slowly cools again.
+There are no suspicion or incident meters. Every employee has their own anger. It starts at 1 and shows on their face up to 5: a resting face, then annoyed, irritated, angry, and finally red-faced and shouting. Offences add to it:
+
+| What you do to them | Anger |
+|---|---|
+| Walk into them | +1 |
+| Take an award or other item off their desk | at least 3, then +2 each time |
+| Take their computer | at least 5, then +5 |
+| Throw something at them (also 10 damage) | at least 5, then +5 |
+| Spray them with extinguisher foam | at least 5, then +5 every 1.5 s of spraying |
+
+Only the person you wronged gets upset; bystanders stay calm. Walking, running or sitting near people is fine. Keep walking into a standing employee and you shove them; afterwards they stop, glare at you and tell you off. At 5 they get up and come after you, yelling about what you did. Break line of sight for 10 seconds and they settle to 4, still on edge; anger never goes back to normal on its own. At 20 they snap: they hunt you for good, shove and punch (10 damage), and each new offence is a 10% chance they pull an assault rifle (24 damage a round, deliberately inaccurate) or a 2% chance of a bazooka (a 10 m blast, up to 100 damage, that hurts employees too).
+
+You have 100 health; the lift is safe. At 0 you spectate a teammate who is still standing, or, with nobody left, the shift ends. Employees have 200 health and can be knocked out.
 
 Most floors hide a boardroom: a dead-end room two rooms long with one door, a long table ringed by mostly occupied chairs, and a presenter at the far end pointing a stick at the quarterly chart. You may walk in and listen; nobody minds unless you bump into them.
 
 ### Office talk
 
-Employees speak a made-up language: you hear gibberish, and a flat speech bubble above their head (always facing you) shows what they mean. Their voice follows their anger: calm at levels 1-2, tense and upset at 3-4, and yelling at 5, when the bubble turns red and the words get rude (never swearing). Two colleagues passing in a hallway either walk on or, half the time, stop for a proper chat about reports, printers, lunch plans and so on. In the boardroom the presenter's words appear above their head.
+Employees speak a made-up language in their own voices: you hear gibberish, and a flat speech bubble above their head (always facing you) shows what they mean, one phrase at a time. Their voice follows their anger: calm at levels 1-2, tense and upset at 3-4, and yelling at 5, when the bubble turns red and the words get rude (never swearing). What they say depends on what you did and how angry they are, with a large pool of lines for each. Two colleagues passing in a hallway either walk on or, half the time, stop for a proper chat about reports, printers, lunch plans and so on. In the boardroom the presenter's words appear above their head.
 
 ### Sitting
 

@@ -3,6 +3,7 @@ using UnityEngine;
 namespace TheElevator.Office
 {
     // Flat speech bubbles drawn on screen above whoever is talking, so they always face the player's view.
+    // One bubble per speaker, one phrase at a time.
     // Calm speech is a white bubble, upset speech is warm orange, and furious yelling is red with bold text.
     public static class SpeechBubbles
     {
@@ -19,7 +20,7 @@ namespace TheElevator.Office
             Vector3 eye = view.transform.position;
             foreach (OfficeEmployee employee in employees)
             {
-                if (!employee || !employee.Speaking) continue;
+                if (!employee || !employee.PhraseShowing) continue;
                 Vector3 anchor = Anchor(employee);
                 float distance = Vector3.Distance(eye, anchor);
                 if (distance > Range || view.WorldToScreenPoint(anchor).z <= 0) continue;
@@ -57,7 +58,7 @@ namespace TheElevator.Office
             Color fill = tone == OfficeVoice.Tone.Yelling ? new Color(1f, .78f, .74f) : tone == OfficeVoice.Tone.Upset ? new Color(1f, .9f, .74f) : new Color(.99f, .99f, .97f);
             Color edge = tone == OfficeVoice.Tone.Yelling ? new Color(.75f, .12f, .1f) : tone == OfficeVoice.Tone.Upset ? new Color(.85f, .5f, .15f) : new Color(.2f, .22f, .26f);
             // Fade out over the last moment of the line.
-            float alpha = Mathf.Clamp01((employee.SpeechUntil - Time.time) * 4);
+            float alpha = Mathf.Clamp01((employee.PhraseUntil - Time.time) * 4);
             Color old = GUI.color;
             // Outline, body and a little tail pointing at the speaker's head.
             float border = Mathf.Max(1.5f, 2.5f * scale);

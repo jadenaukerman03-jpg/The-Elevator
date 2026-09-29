@@ -87,10 +87,21 @@ namespace TheElevator.Office
         public void WitnessTheft(OfficeCargo cargo)
         {
             if(!Game)return;
-            OfficeEmployee owner=cargo.Workstation?cargo.Workstation.Occupant:null;
-            bool disturbed=owner&&!owner.Travelling&&Vector3.Distance(owner.transform.position,cargo.Workstation.transform.position)<.8f;
-            ReportAction(Game.Player.transform.position,22,disturbed?owner:null);
-            if(disturbed){owner.React(100,"I was using that computer. Put it back.",Grievance.Computer);cargo.Workstation.Equipment=null;cargo.Workstation.EquipmentMissing=true;}
+            // Only the owner gets upset, and only if they are at their desk or see it happen. Anyone else watching
+            // just files it away (hidden suspicion that can reach security); they don't react.
+            OfficeEmployee owner=cargo.Workstation?(cargo.Workstation.HomeOwner?cargo.Workstation.HomeOwner:cargo.Workstation.Occupant):null;
+            if(owner&&owner.Dead)owner=null;
+            bool atDesk=owner&&!owner.Travelling&&Vector3.Distance(owner.transform.position,cargo.Workstation.transform.position)<.8f;
+            bool notices=owner&&(atDesk||owner.Sees(Game.Player.transform.position));
+            ReportAction(Game.Player.transform.position,22,notices?owner:null);
+            if(!notices||cargo.Taken)return;
+            cargo.Taken=true;
+            string item=cargo.Item?cargo.Item.Title.ToLowerInvariant():"";
+            bool computer=item.Contains("computer")||item.Contains("laptop");
+            owner.React(100);
+            if(computer)owner.Offend(Grievance.Computer,owner.Anger<5?"Hey! I was using that to work with! Give that back!":null);
+            else owner.Offend(item.Contains("award")?Grievance.Award:Grievance.Property);
+            if(computer&&cargo.Workstation.Equipment&&cargo.Workstation.Equipment.gameObject==cargo.gameObject){cargo.Workstation.Equipment=null;cargo.Workstation.EquipmentMissing=true;}
         }
         // The presenter always stands; roughly three of every four chairs around the table are taken.
         void PopulateMeeting()
@@ -126,10 +137,12 @@ namespace TheElevator.Office
         sealed class Chat { public OfficeEmployee A,B; public string[] Lines; public int Next; public float At; }
         readonly List<Chat> chats=new List<Chat>();
         readonly Dictionary<long,float> passed=new Dictionary<long,float>();
+        // Nobody chats again for a minute after a conversation.
+        readonly Dictionary<OfficeEmployee,float> chattedUntil=new Dictionary<OfficeEmployee,float>();
         readonly System.Random chatter=new System.Random(4242);
         float nextChatScan,nextPresenterLine;
         public int ActiveConversations { get { return chats.Count; } }
-        static bool Free(OfficeEmployee e){return e&&!e.Partner&&!e.Chasing&&!e.Pushed&&!e.Blinded&&e.AngerLevel<3&&!e.Robot.Seated;}
+        static bool Free(OfficeEmployee e){return e&&!e.Dead&&!e.Partner&&!e.Chasing&&!e.Pushed&&!e.Blinded&&e.AngerLevel<3&&!e.Robot.Seated;}
         void UpdateConversations()
         {
             if(Time.time>=nextChatScan)
@@ -140,12 +153,17 @@ namespace TheElevator.Office
                 {
                     OfficeEmployee a=walking[i],b=walking[j];
                     if(a.Partner||b.Partner)continue;
+                    // Only people walking past each other (heading in opposite directions), not walking together.
+                    if(Vector3.Dot(a.transform.forward,b.transform.forward)>-.3f)continue;
+                    if((chattedUntil.TryGetValue(a,out float restA)&&Time.time<restA)||(chattedUntil.TryGetValue(b,out float restB)&&Time.time<restB))continue;
                     Vector3 gap=a.transform.position-b.transform.position;if(Mathf.Abs(gap.y)>.5f)continue;gap.y=0;
                     if(gap.sqrMagnitude>1.9f*1.9f)continue;
                     long key=Mathf.Min(a.EmployeeId,b.EmployeeId)*100000L+Mathf.Max(a.EmployeeId,b.EmployeeId);
                     if(passed.TryGetValue(key,out float until)&&Time.time<until)continue;
                     passed[key]=Time.time+45;
+                    // Half the time they stop and chat; otherwise they walk on, often with a quick hello.
                     if(chatter.NextDouble()<.5)StartConversation(a,b);
+                    else if(chatter.NextDouble()<.6){string last=null;(chatter.NextDouble()<.5?a:b).Say(OfficeDialogue.Pick(OfficeDialogue.Greetings,chatter,ref last));}
                 }
             }
             for(int i=chats.Count-1;i>=0;i--)
@@ -166,7 +184,11 @@ namespace TheElevator.Office
             chats.Add(new Chat{A=a,B=b,Lines=OfficeDialogue.Conversations[chatter.Next(OfficeDialogue.Conversations.Length)],At=Time.time+.4f});
             return true;
         }
-        static void EndConversation(Chat chat){if(chat.A&&chat.A.Partner==chat.B)chat.A.Partner=null;if(chat.B&&chat.B.Partner==chat.A)chat.B.Partner=null;}
+        void EndConversation(Chat chat)
+        {
+            if(chat.A&&chat.A.Partner==chat.B)chat.A.Partner=null;if(chat.B&&chat.B.Partner==chat.A)chat.B.Partner=null;
+            if(chat.A)chattedUntil[chat.A]=Time.time+60;if(chat.B)chattedUntil[chat.B]=Time.time+60;
+        }
         // The presenter keeps presenting; their words show in a bubble while you are in the room.
         void UpdatePresenter()
         {
@@ -182,6 +204,7 @@ namespace TheElevator.Office
             int bumps=0;
             foreach(OfficeEmployee employee in Employees)
             {
+                if(employee.Dead)continue;
                 Vector3 delta=employee.transform.position-position;float height=delta.y;delta.y=0;float gap=delta.magnitude;
                 bool contact=gap<.74f&&Mathf.Abs(height)<1;
                 bool into=contact&&motion.magnitude>.5f&&Vector3.Dot(motion.normalized,delta.normalized)>.3f;

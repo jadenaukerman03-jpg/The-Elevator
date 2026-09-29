@@ -51,8 +51,22 @@ namespace TheElevator
             shell.enabled = false;
         }
 
+        // Thrown items hurt the first employee they hit (10 damage) and make them furious.
+        float thrownUntil;
+        bool thrown;
         void FixedUpdate()
         {
+            if (!IsHeld && thrown)
+            {
+                if (Time.time > thrownUntil || Body.linearVelocity.magnitude < 2.5f || !game || !game.CurrentOffice) thrown = false;
+                else
+                {
+                    BoxCollider bounds = shell as BoxCollider;
+                    float reach = bounds ? Mathf.Min(.25f, bounds.size.magnitude * .3f) : .15f;
+                    TheElevator.Office.OfficeEmployee struck = game.CurrentOffice.EmployeeAt(Body.worldCenterOfMass, reach);
+                    if (struck) { thrown = false; struck.HitByThrown(Body.worldCenterOfMass); }
+                }
+            }
             if (!IsHeld || !carrier) return;
             Vector3 chest=carrier.View.transform.position;
             Vector3 forward=carrier.View.transform.forward;
@@ -90,6 +104,7 @@ namespace TheElevator
             Vector3 direction=carrier.View?carrier.View.transform.forward:carrier.transform.forward;
             Vector3 velocity=direction*(toss?ThrowSpeed(Mass,charge):.6f)+Vector3.up*(toss?Mathf.Lerp(.3f,1.3f,Mathf.Clamp01(charge)):.1f);
             IsHeld=false;carrier=null;shell.enabled=true;Body.isKinematic=false;Body.linearVelocity=velocity;
+            if(toss){thrown=true;thrownUntil=Time.time+3;}
         }
         void OnCollisionEnter(Collision collision)
         {

@@ -120,7 +120,8 @@ namespace TheElevator.Office
                     Kit.A.Box(asset,"Laptop lid logo",new Vector3(0,.026f,0),new Vector3(.08f,.004f,.08f),Kit.A.Brass);
                 }
                 SalvageItem value=asset.gameObject.AddComponent<SalvageItem>();value.Configure(Game,title,mass,price,false,lootSize);
-                OfficeCargo cargo=asset.gameObject.AddComponent<OfficeCargo>();cargo.Initialize(this,value,false);loot++;
+                // Desk items belong to whoever works at that desk.
+                OfficeCargo cargo=asset.gameObject.AddComponent<OfficeCargo>();cargo.Initialize(this,value,false);cargo.Workstation=task;loot++;
             }
         }
         // Wall-mounted extinguishers: cheap pickups the player can carry, throw or spray.
@@ -128,6 +129,12 @@ namespace TheElevator.Office
         {
             foreach(Transform mount in Kit.ExtinguisherMounts)
                 if(mount)FireExtinguisher.Create(Game,Kit.A,transform,mount.position+Vector3.up*FireExtinguisher.HalfHeight,mount.rotation);
+        }
+        // The living employee whose body a point is inside (with some padding), for thrown objects.
+        public OfficeEmployee EmployeeAt(Vector3 point,float padding)
+        {
+            foreach(OfficeEmployee employee in Employees)if(employee&&!employee.Dead&&OfficeWeapons.InBody(point,employee.transform.position,padding))return employee;
+            return null;
         }
         public bool HasAccess(int clearance,int department)
         { return BadgeLevel>=clearance&&(clearance<2||BadgeDepartment==department||BadgeLevel>=3)&&!(Alarm&&Plan.Config.InvalidateBadgesOnAlarm); }
@@ -140,7 +147,7 @@ namespace TheElevator.Office
         }
         public void ReportToSecurity(int department,float amount,Vector3 lastSeen){LastReportedPosition=lastSeen;RaiseLocal(department,amount);}
         public void ReportAction(Vector3 point,float amount,OfficeEmployee excluded)
-        { foreach(OfficeEmployee employee in Employees)if(employee!=excluded&&employee.Sees(point))employee.React(amount,"What are you doing with company property?"); }
+        { foreach(OfficeEmployee employee in Employees)if(employee!=excluded&&!employee.Dead&&employee.Sees(point))employee.React(amount); }
         public void HearNoise(Vector3 point,float strength)
         { foreach(OfficeEmployee employee in Employees)if(Vector3.Distance(employee.transform.position,point)<strength*12)employee.Robot.LookTarget=point; }
         public bool InteractPressed()

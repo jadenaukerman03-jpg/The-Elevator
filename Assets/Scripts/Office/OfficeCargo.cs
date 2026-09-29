@@ -7,6 +7,8 @@ namespace TheElevator.Office
         public SalvageItem Item;
         public bool Mandatory;
         public OfficeTaskPoint Workstation;
+        // Already taken once from its owner's desk; picking it up again is not a new theft.
+        public bool Taken;
         public bool Mounted=true;
         public float Condition=1;
         public Vector3 SpawnPosition,LastSafePosition;

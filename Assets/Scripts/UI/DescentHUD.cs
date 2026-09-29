@@ -115,6 +115,8 @@ namespace TheElevator
             Text(new Rect(42, bottom + 63, 265, 24), "LOAD  " + Mathf.CeilToInt(game.Load) + " / 180 KG", body);
             Bar(new Rect(42, bottom + 96, 264, 6), game.Load / RunRules.Capacity,
                 game.Load > RunRules.Capacity ? Workshop.Red : Workshop.Yellow);
+            Text(new Rect(width - 267, height - 112, 245, 23), "HEALTH  " + Mathf.CeilToInt(game.Player.Health), small);
+            Bar(new Rect(width - 267, height - 84, 220, 6), game.Player.Health / WorkerController.MaxHealth, game.Player.Health < 35 ? Workshop.Red : Workshop.Mint);
             Text(new Rect(342, height - 75, 520, 23), "STAMINA", small);
             Bar(new Rect(342, height - 47, 180, 5), game.Player.Stamina, Workshop.Cream);
 

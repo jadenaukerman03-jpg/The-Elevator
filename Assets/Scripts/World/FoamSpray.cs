@@ -125,7 +125,7 @@ namespace TheElevator
         {
             foreach (OfficeEmployee employee in nearby)
             {
-                if (!employee) continue;
+                if (!employee || employee.Dead) continue;
                 Transform head = employee.Robot ? employee.Robot.Head : null;
                 // The head transform is the neck pivot; the round head sits above it.
                 Vector3 centre = head ? head.TransformPoint(BeanRig.HeadCenter) : employee.transform.position + Vector3.up * 1.45f;

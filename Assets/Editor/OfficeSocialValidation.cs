@@ -51,7 +51,7 @@ namespace TheElevator.Editor
                     OfficeEmployee owner=office.Employees.Find(e=>e.Station&&e.Station.Equipment&&e.Station.Equipment.GetComponent<SalvageItem>());Check(owner,"Occupied computer exists");
                     var item=owner.Station.Equipment.GetComponent<SalvageItem>();Check(item,"Work computer is loot");
                     float prior=owner.Suspicion;item.PickUp(game.Player);Check(owner.Suspicion>=prior+60,"Occupied computer theft strongly alerts owner");Check(office.SuspicionLevel>=60,"Suspicion meter reflects witness");
-                    item.Release(false);foreach(OfficeEmployee e in office.Employees)e.Suspicion=0;
+                    item.Release(false);foreach(OfficeEmployee e in office.Employees){e.Suspicion=0;e.ResetTemperForValidation();}
                     bool planned=false;
                     foreach(OfficeEmployee e in office.Employees)
                     {
