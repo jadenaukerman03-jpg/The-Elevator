@@ -8,11 +8,14 @@ namespace TheElevator.Office
     // past 5. A bump adds 1. Taking an award or another thing off their desk puts them at 3 at least; taking their
     // computer, throwing something at them or foaming them puts them at 5 at least; repeating those adds 2 or 5 more.
     // Anger never cools on its own, with one exception: a furious employee who loses sight of the player for a while
-    // settles to 4 (on edge). Once furious, every further offence is a 2% chance they pull a rifle and a 0.5% chance of a
-    // bazooka, and then they hunt the player. At 20 they snap anyway: they hunt the player for good and swing at them.
+    // settles to 4 (on edge). Three employees per floor keep a weapon in their desk (their Sidearm): two a rifle,
+    // one a bazooka. Once one of them is furious, every further offence is a 2% chance (rifle) or 1% chance (bazooka)
+    // they pull it, and then they hunt the player. At 20 anyone snaps: they hunt the player for good and swing at them.
     public sealed partial class OfficeEmployee
     {
-        public const float SnapPoint = 20, MaxHealth = 200, LoseInterest = 10, RifleChance = .02f, BazookaChance = .005f;
+        public const float SnapPoint = 20, MaxHealth = 200, LoseInterest = 10, RifleChance = .02f, BazookaChance = .01f;
+        // The weapon kept in this employee's desk, if any (assigned by the floor: two rifles and one bazooka).
+        public Arms Sidearm;
         public float Anger { get; private set; } = 1;
         public int AngerLevel { get { return Mathf.Clamp((int)Anger, 1, 5); } }
         public bool Snapped { get { return Anger >= SnapPoint; } }
@@ -62,7 +65,7 @@ namespace TheElevator.Office
             // Making someone who is already furious angrier is a small chance they reach for something in their desk.
             if (wasFurious && Weapon == Arms.None && Office.Game)
             {
-                Arms drawn = WeaponFor(random.NextDouble());
+                Arms drawn = Draws(Sidearm, random.NextDouble()) ? Sidearm : Arms.None;
                 if (drawn != Arms.None)
                 {
                     // Armed means out for revenge: they hunt the player and never calm down.
@@ -76,7 +79,7 @@ namespace TheElevator.Office
             else if (!Speaking || OfficeDialogue.TierFor(Anger) != before || (Snapped && !wasSnapped)) Say(OfficeDialogue.Reaction(grievance, Anger, random, ref lastLine));
         }
 
-        public static Arms WeaponFor(double roll) { return roll < BazookaChance ? Arms.Bazooka : roll < BazookaChance + RifleChance ? Arms.Rifle : Arms.None; }
+        public static bool Draws(Arms sidearm, double roll) { return roll < (sidearm == Arms.Rifle ? RifleChance : sidearm == Arms.Bazooka ? BazookaChance : 0); }
 
         public void Bump() { Offend(Grievance.Bump); }
 
@@ -124,18 +127,17 @@ namespace TheElevator.Office
         void Die()
         {
             Dead = true; Health = 0; State = "Knocked out";
-            Chasing = false; route.Clear(); Partner = null; phrases.Clear(); Speech = null;
+            Chasing = false; route.Clear(); Partner = null; phrases.Clear(); waiting.Clear(); Speech = null;
             if (voice) voice.Stop();
             motor.enabled = false;
             // Limp: no typing or reaching pose left in the arms.
             Robot.Seated = false; Robot.Reaching = false; Robot.Talking = false; Robot.Speed = 0; Robot.Activity = OfficeTask.Reading;
             if (weapon)
             {
-                // The weapon clatters to the floor.
-                weapon.SetParent(Office.transform, true);
-                Rigidbody body = weapon.gameObject.AddComponent<Rigidbody>(); body.mass = 4;
-                BoxCollider box = weapon.gameObject.AddComponent<BoxCollider>(); box.size = new Vector3(.12f, .15f, 1f);
-                weapon = null;
+                // The weapon clatters to the floor, and anyone can pick it up.
+                if (Office.Game) PlayerWeapon.Drop(weapon, Weapon, Office);
+                else Destroy(weapon.gameObject);
+                weapon = null; Weapon = Arms.None;
             }
             if (Cup) { Destroy(Cup.gameObject); Cup = null; }
             // Limp: the body falls wherever physics takes it and stays there.
@@ -279,9 +281,27 @@ namespace TheElevator.Office
         OfficeVoice.Tone synthesisTone;
         float nextRant;
 
+        // One line at a time: anything said while they are still talking waits until they finish (only the most
+        // recent waiting line is kept, so reactions never pile up).
+        readonly Queue<string> waiting = new Queue<string>();
+        public int WaitingLines { get { return waiting.Count; } }
         public void Say(string line)
         {
             if (Dead || string.IsNullOrEmpty(line)) return;
+            if (Speaking)
+            {
+                waiting.Clear(); waiting.Enqueue(line);
+                float extra = 0;
+                foreach (string phrase in OfficeDialogue.Phrases(line)) extra += OfficeVoice.Duration(phrase, OfficeVoice.ToneFor(AngerLevel)) + PhraseGap;
+                SpeechUntil = Mathf.Max(SpeechUntil, PhraseUntil) + PhraseGap + extra;
+                nextRant = SpeechUntil + 1 + (float)random.NextDouble() * 1.5f;
+                return;
+            }
+            Begin(line);
+        }
+
+        void Begin(string line)
+        {
             phrases.Clear();
             foreach (string phrase in OfficeDialogue.Phrases(line)) phrases.Enqueue(phrase);
             if (phrases.Count == 0) return;
@@ -328,7 +348,9 @@ namespace TheElevator.Office
         void UpdateSpeech()
         {
             PlaySynthesized();
-            if (phrases.Count > 0 && Time.time >= PhraseUntil + PhraseGap) NextPhrase();
+            if (Time.time < PhraseUntil + PhraseGap) return;
+            if (phrases.Count > 0) NextPhrase();
+            else if (waiting.Count > 0) Begin(waiting.Dequeue());
         }
     }
 }

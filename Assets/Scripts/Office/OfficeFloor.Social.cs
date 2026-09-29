@@ -36,6 +36,13 @@ namespace TheElevator.Office
                 }
             }
         }
+        // Every floor has exactly three armed employees: two keep a rifle in their desk, one a bazooka.
+        void AssignSidearms()
+        {
+            System.Random dice=new System.Random(unchecked(Map.Manifest.Recipe.Seed*31+7));
+            List<OfficeEmployee> pool=new List<OfficeEmployee>(Employees);
+            for(int i=0;i<3&&pool.Count>0;i++){int pick=dice.Next(pool.Count);pool[pick].Sidearm=i<2?Arms.Rifle:Arms.Bazooka;pool.RemoveAt(pick);}
+        }
         void PopulateEmployees(OfficeTaskPoint supervisor)
         {
             SpawnEmployee(supervisor,true);
@@ -206,7 +213,9 @@ namespace TheElevator.Office
             {
                 if(employee.Dead)continue;
                 Vector3 delta=employee.transform.position-position;float height=delta.y;delta.y=0;float gap=delta.magnitude;
-                bool contact=gap<.74f&&Mathf.Abs(height)<1;
+                // Someone in a chair is reached across the chair, so contact starts a little further out.
+                float reach=employee.Robot.Seated?1.02f:.74f;
+                bool contact=gap<reach&&Mathf.Abs(height)<1;
                 bool into=contact&&motion.magnitude>.5f&&Vector3.Dot(motion.normalized,delta.normalized)>.3f;
                 // Walking into someone pushes them out of the way for as long as you keep walking into them.
                 if(into)employee.Shove(delta.normalized*motion.magnitude*.95f);
@@ -215,7 +224,7 @@ namespace TheElevator.Office
                     touching.Add(employee);
                     if(into){employee.Bump();bumps++;}
                 }
-                else if(!contact&&gap>.95f)touching.Remove(employee);
+                else if(!contact&&gap>reach+.2f)touching.Remove(employee);
             }
             return bumps;
         }

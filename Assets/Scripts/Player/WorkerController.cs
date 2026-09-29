@@ -134,6 +134,7 @@ namespace TheElevator
             Vector3 input = Vector3.ClampMagnitude(new Vector3(horizontal, 0, forward), 1);
             Vector3 direction = Quaternion.Euler(0, yaw, 0) * input;
             FireExtinguisher extinguisher = Held ? Held.GetComponent<FireExtinguisher>() : null;
+            TheElevator.Office.PlayerWeapon weapon = Held ? Held.GetComponent<TheElevator.Office.PlayerWeapon>() : null;
             SetCrouched(Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C));
             MovingFast = !Crouched && Input.GetKey(KeyCode.LeftShift) && Stamina > 0.08f && input.sqrMagnitude > 0.1f;
             Stamina = infiniteStamina ? 1f : Mathf.Clamp01(Stamina + Time.deltaTime * (MovingFast ? -0.23f : 0.17f));
@@ -168,7 +169,7 @@ namespace TheElevator
             }
             UpdateTarget();
             // With a usable item in hand the mouse button uses it; E still interacts.
-            if (Input.GetKeyDown(KeyCode.E) || (CanInteract && !extinguisher && Input.GetMouseButtonDown(0)))
+            if (Input.GetKeyDown(KeyCode.E) || (CanInteract && !extinguisher && !weapon && Input.GetMouseButtonDown(0)))
             {
                 if(elevatorButton){elevatorButton.Press();}
                 else if(notebook){notebook.Open();}
@@ -186,6 +187,8 @@ namespace TheElevator
             if (Input.GetKeyDown(KeyCode.F) && Held && Held.IsBattery && InCabin) game.UseBattery();
             extinguisher = Held ? Held.GetComponent<FireExtinguisher>() : null;
             if (extinguisher) extinguisher.Operate(this, !ChargingThrow && Input.GetMouseButton(0), Time.deltaTime);
+            weapon = Held ? Held.GetComponent<TheElevator.Office.PlayerWeapon>() : null;
+            if (weapon) weapon.Operate(this, !ChargingThrow && Input.GetMouseButton(0), !ChargingThrow && Input.GetMouseButtonDown(0));
 
             if (transform.position.y < -8) game.Finish(false, "The facility has no basement for this basement.");
         }
@@ -462,6 +465,8 @@ namespace TheElevator
             // Throw strength and item usage share one ring around the cursor.
             if(ChargingThrow){CursorGauge.Draw(ThrowCharge,Color.Lerp(new Color(1,.85f,.3f),new Color(1,.3f,.12f),ThrowCharge));return;}
             FireExtinguisher extinguisher=Held.GetComponent<FireExtinguisher>();
+            TheElevator.Office.PlayerWeapon weapon=Held.GetComponent<TheElevator.Office.PlayerWeapon>();
+            if(weapon){CursorGauge.Draw(weapon.Used,weapon.Empty?new Color(.95f,.32f,.25f):new Color(1f,.88f,.45f,.85f));return;}
             if(extinguisher&&extinguisher.Used>0)CursorGauge.Draw(extinguisher.Used,extinguisher.Empty?new Color(.95f,.32f,.25f):new Color(.93f,.97f,1f,extinguisher.Spraying?1:.7f));
         }
         void OnDestroy(){if(Hands)Destroy(Hands.gameObject);}

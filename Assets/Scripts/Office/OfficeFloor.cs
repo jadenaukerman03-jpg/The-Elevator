@@ -42,7 +42,7 @@ namespace TheElevator.Office
             OfficeTaskPoint supervisor=Stations.Find(s=>s.RoomId==Plan.SupervisorRoom);
             if(!supervisor)throw new InvalidOperationException("Credential holder has no usable workstation.");
             PrepareWorkplaces();
-            PopulateEmployees(supervisor);
+            PopulateEmployees(supervisor);AssignSidearms();
             BuildDeskKeycard(supervisor);
             BuildDoors();
             if(Game)

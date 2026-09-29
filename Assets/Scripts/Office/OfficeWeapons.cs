@@ -4,12 +4,16 @@ namespace TheElevator.Office
 {
     public enum Arms { None, Rifle, Bazooka }
 
-    // What a snapped employee (anger 20+) might pull out of their desk: an assault rifle or a bazooka.
-    // Rifle rounds are deliberately inaccurate so the player can get away; rockets explode with a 10 m blast
-    // that hurts anyone caught in it, employees included.
+    // Two employees on every floor keep an assault rifle in their desk and one keeps a bazooka. In an employee's
+    // hands the rifle does 10 a round and misses a lot, so the player can get away; a rocket's 10 m blast does up
+    // to 90 and hurts anyone caught in it, employees included. Knock an armed employee out and they drop it: in a
+    // player's hands every rifle round and every rocket blast is lethal.
     public static class OfficeWeapons
     {
-        public const float RifleDamage = 24, PunchDamage = 10, BlastRadius = 10, BlastDamage = 100, RocketSpeed = 15;
+        public const float RifleDamage = 10, PunchDamage = 5, BlastRadius = 10, BlastDamage = 90, RocketSpeed = 15;
+        // Weapons in a player's hands: one shot, one knockout.
+        public const float PlayerRifleDamage = 1000, PlayerBlastDamage = 1000;
+        public const int RifleMagazine = 30, BazookaRockets = 3;
         const int Mask = ~((1 << 2) | (1 << 8));
         // Counters for checks and tuning.
         public static int Shots, Explosions, Swings;
@@ -66,7 +70,7 @@ namespace TheElevator.Office
         public static bool RifleRound(Vector3 muzzle, Vector3 target, Vector3 feet, float targetSpeed, System.Random random, out Vector3 direction, out float along)
         {
             float distance = Vector3.Distance(muzzle, target);
-            float spread = 5 + distance * .35f + (targetSpeed > 1 ? 3 : 0);
+            float spread = 9 + distance * .55f + (targetSpeed > 1 ? 4 : 0);
             direction = Scatter((target - muzzle).normalized, spread, random);
             float wall = Physics.Raycast(muzzle, direction, out RaycastHit hit, 60, Mask, QueryTriggerInteraction.Ignore) ? hit.distance : 60;
             along = wall;
@@ -74,24 +78,54 @@ namespace TheElevator.Office
             return false;
         }
 
+        // ---- A player's rifle: along the crosshair with a hair of spread; anything it hits is out ----
+        public static void FirePlayerRifle(OfficeFloor office, WorkerController shooter, Vector3 muzzle, System.Random random)
+        {
+            Transform view = shooter.View.transform;
+            Vector3 direction = Scatter(view.forward, .6f, random);
+            float along = 80;
+            Object struck = null;
+            // Rounds pass through chair frames; anything else solid stops them.
+            if (Physics.Raycast(view.position, direction, out RaycastHit hit, 80, ~((1 << 2) | (1 << 9)), QueryTriggerInteraction.Ignore))
+            {
+                along = hit.distance;
+                OfficeEmployee employee = hit.collider.GetComponentInParent<OfficeEmployee>();
+                if (employee && !employee.Dead) struck = employee;
+            }
+            // Teammates have no collider in the way of rays (their own layer), so test them as bodies.
+            if (office && office.Game)
+                foreach (WorkerController member in office.Game.Crew)
+                    if (member != shooter && !member.Down && RayHitsBody(view.position, direction, member.transform.position, out float t) && t < along) { along = t; struck = member; }
+            Shots++;
+            Flash(muzzle, .16f, .06f, new Color(1f, .85f, .4f));
+            Tracer(muzzle, view.position + direction * along, new Color(1f, .9f, .5f));
+            Play(Clip(ref rifleShot, 0), muzzle, 1);
+            if (struck is OfficeEmployee e) e.Damage(PlayerRifleDamage, view.position, 3);
+            else if (struck is WorkerController w) w.Damage(PlayerRifleDamage, view.position, 3);
+        }
+
         // ---- Bazooka ----
         public static void FireRocket(OfficeEmployee shooter, Vector3 muzzle, Vector3 target, System.Random random)
+        { FireRocket(shooter.Office, shooter, null, muzzle, target, 3, BlastDamage, random); }
+
+        public static void FireRocket(OfficeFloor office, OfficeEmployee npc, WorkerController player, Vector3 muzzle, Vector3 target, float spread, float damage, System.Random random)
         {
-            Vector3 direction = Scatter((target - muzzle).normalized, 3, random);
+            Vector3 direction = Scatter((target - muzzle).normalized, spread, random);
             GameObject rocket = new GameObject("Rocket");
             rocket.transform.SetPositionAndRotation(muzzle, Quaternion.LookRotation(direction));
-            OfficeArt a = shooter.Office.Kit.A;
+            OfficeArt a = office.Kit.A;
             GameObject body = a.Round(rocket.transform, "Rocket body", Vector3.zero, new Vector3(.09f, .18f, .09f), a.W.Soft.Leaf);
             body.transform.localRotation = Quaternion.Euler(90, 0, 0);
             a.Round(rocket.transform, "Rocket nose", new Vector3(0, 0, .2f), new Vector3(.09f, .09f, .12f), a.Red, PrimitiveType.Sphere);
             Glow(PrimitiveType.Sphere, rocket.transform, new Vector3(0, 0, -.24f), Vector3.one * .12f, new Color(1f, .6f, .2f));
-            rocket.AddComponent<OfficeRocket>().Launch(shooter, direction * RocketSpeed);
+            rocket.AddComponent<OfficeRocket>().Launch(office, npc, player, direction * RocketSpeed, damage);
             Flash(muzzle, .3f, .1f, new Color(1f, .7f, .3f));
             Play(Clip(ref rocketLaunch, 1), muzzle, 1);
         }
 
         // Everyone within the blast radius with nothing solid in between is hurt, most at the centre.
-        public static void Explode(OfficeFloor office, Vector3 centre)
+        public static void Explode(OfficeFloor office, Vector3 centre) { Explode(office, centre, BlastDamage); }
+        public static void Explode(OfficeFloor office, Vector3 centre, float damage)
         {
             Explosions++;
             Flash(centre, BlastRadius * .4f, .55f, new Color(1f, .55f, .2f));
@@ -102,12 +136,12 @@ namespace TheElevator.Office
             Object.Destroy(light, .25f);
             Play(Clip(ref explosion, 2), centre, 1);
             if (!office || !office.Game) return;
-            WorkerController player = office.Game.Player;
-            if (player && !player.Down && Exposed(centre, player.transform.position + Vector3.up, out float d))
-                player.Damage(BlastDamage * (1 - d / BlastRadius), centre, 14 * (1 - d / BlastRadius));
+            foreach (WorkerController member in office.Game.Crew)
+                if (!member.Down && Exposed(centre, member.transform.position + Vector3.up, out float d))
+                    member.Damage(damage * (1 - d / BlastRadius), centre, 14 * (1 - d / BlastRadius));
             foreach (OfficeEmployee employee in office.Employees)
                 if (employee && !employee.Dead && Exposed(centre, employee.transform.position + Vector3.up, out float e))
-                    employee.Blasted(BlastDamage * (1 - e / BlastRadius), centre, 10 * (1 - e / BlastRadius));
+                    employee.Blasted(damage * (1 - e / BlastRadius), centre, 10 * (1 - e / BlastRadius));
         }
 
         static bool Exposed(Vector3 centre, Vector3 body, out float distance)
@@ -160,7 +194,7 @@ namespace TheElevator.Office
             fx.gameObject.AddComponent<OfficeFx>().Play(Vector3.one * size, life);
         }
 
-        static void Tracer(Vector3 from, Vector3 to, Color color)
+        public static void Tracer(Vector3 from, Vector3 to, Color color)
         {
             Vector3 middle = (from + to) * .5f;
             Transform fx = Glow(PrimitiveType.Cube, null, middle, new Vector3(.015f, .015f, Vector3.Distance(from, to)), color);
@@ -233,28 +267,33 @@ namespace TheElevator.Office
         }
     }
 
-    // A rocket in flight: explodes on the first wall, floor, person or after a few seconds.
+    // A rocket in flight: explodes on the first wall, floor, person or after a few seconds. The one who fired it
+    // is safe from a direct hit for the first moment (not from the blast).
     public sealed class OfficeRocket : MonoBehaviour
     {
-        OfficeEmployee shooter;
+        OfficeFloor office;
+        OfficeEmployee npc;
+        WorkerController player;
         Vector3 velocity;
-        float age;
+        float age, damage;
         const int Mask = ~((1 << 2) | (1 << 8));
-        public void Launch(OfficeEmployee from, Vector3 v) { shooter = from; velocity = v; }
+        public void Launch(OfficeFloor floor, OfficeEmployee fromEmployee, WorkerController fromPlayer, Vector3 v, float blast)
+        { office = floor; npc = fromEmployee; player = fromPlayer; velocity = v; damage = blast; }
         void Update()
         {
             float dt = Time.deltaTime;
             age += dt;
             Vector3 step = velocity * dt, next = transform.position + step;
-            OfficeFloor office = shooter ? shooter.Office : null;
             bool boom = age > 4;
             Vector3 at = next;
             if (!boom && Physics.Raycast(transform.position, velocity.normalized, out RaycastHit hit, step.magnitude + .1f, Mask, QueryTriggerInteraction.Ignore)) { boom = true; at = hit.point; }
-            if (!boom && office && office.Game && office.Game.Player && OfficeWeapons.InBody(next, office.Game.Player.transform.position, .15f)) boom = true;
+            if (!boom && office && office.Game)
+                foreach (WorkerController member in office.Game.Crew)
+                    if (!member.Down && (member != player || age > .4f) && OfficeWeapons.InBody(next, member.transform.position, .15f)) { boom = true; break; }
             if (!boom && office)
                 foreach (OfficeEmployee employee in office.Employees)
-                    if (employee && !employee.Dead && (employee != shooter || age > .4f) && OfficeWeapons.InBody(next, employee.transform.position, .1f)) { boom = true; break; }
-            if (boom) { OfficeWeapons.Explode(office, at); Destroy(gameObject); return; }
+                    if (employee && !employee.Dead && (employee != npc || age > .4f) && OfficeWeapons.InBody(next, employee.transform.position, .1f)) { boom = true; break; }
+            if (boom) { OfficeWeapons.Explode(office, at, damage); Destroy(gameObject); return; }
             transform.position = next;
         }
     }

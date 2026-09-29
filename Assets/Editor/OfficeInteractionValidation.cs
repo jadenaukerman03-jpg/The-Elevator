@@ -24,6 +24,8 @@ namespace TheElevator.Editor
         static int shotsBefore,swingsBefore,blastsBefore;
         static float lowestHealth;
         static WorkerController teammate;
+        static OfficeEmployee rocketeer,target;
+        static PlayerWeapon playerGun;
         static OfficeInteractionValidation(){EditorApplication.update+=Tick;Application.logMessageReceived+=Log;}
         public static void Run()
         {
@@ -170,7 +172,10 @@ namespace TheElevator.Editor
                     if(Time.time-started<1f)return;
                     Check(!game.Player.Seat&&seat.Free(office)&&(!seat.Station(office)||!seat.Station(office).ReservedByPlayer),"Player stands back up and frees the seat");
                     // One phrase per bubble.
-                    talkerA.Say("Hey! Give that back.");Check(talkerA.Speech=="Hey!"&&talkerA.Speaking,"Speech shows one phrase at a time");
+                    // One phrase per bubble, and one line at a time: a new line waits for the current one to finish.
+                    OfficeEmployee quiet=office.Employees.Find(e=>!e.Dead&&!e.Speaking&&!e.Partner);
+                    quiet.Say("Hey! Give that back.");Check(quiet.Speech=="Hey!"&&quiet.Speaking,"Speech shows one phrase at a time");
+                    quiet.Say("Seriously?");Check(quiet.Speech=="Hey!"&&quiet.WaitingLines==1,"A new line waits until the current one is finished");
                     // Thrown things: 10 damage and straight to 5.
                     victim=office.Employees.Find(e=>!e.Dead&&e.Anger<2&&e.HomeRoom!=office.Plan.MeetingRoom);Check(victim,"Calm employee to throw at");
                     float health=victim.Health;victim.HitByThrown(victim.transform.position+Vector3.up);
@@ -199,7 +204,7 @@ namespace TheElevator.Editor
                     // Rifle fire is deliberately inaccurate.
                     System.Random dice=new System.Random(5);int hits=0;Vector3 feet=new Vector3(0,300,0);
                     for(int i=0;i<400;i++)if(OfficeWeapons.RifleRound(feet+new Vector3(0,1.3f,-10),feet+Vector3.up*1.1f,feet,0,dice,out Vector3 d,out float a))hits++;
-                    Check(hits>20&&hits<220,"Rifle is inaccurate at 10 m ("+hits+"/400 hits)");
+                    Check(hits>5&&hits<120,"An employee's rifle is very inaccurate at 10 m ("+hits+"/400 hits)");
                     // Live: an armed employee shoots at the player, an unarmed one throws punches.
                     rifleman=office.Employees.Find(e=>!e.Dead&&e!=brute&&e!=foamed&&e.HomeRoom==office.Plan.MeetingRoom&&e.Station&&e.Station.Activity==OfficeTask.Meeting);
                     rifleman.ArmForValidation(Arms.Rifle);Check(rifleman.Weapon==Arms.Rifle&&rifleman.Snapped,"Snapped employees can carry a rifle");
@@ -214,7 +219,7 @@ namespace TheElevator.Editor
                     Check(OfficeWeapons.Swings>swingsBefore,"The unarmed employee swings at the player ("+(OfficeWeapons.Swings-swingsBefore)+" swings)");
                     Check(lowestHealth<100,"The player gets hurt (lowest health "+lowestHealth+")");
                     // Bazooka: a real rocket, and a 10 m blast that hurts employees too.
-                    OfficeEmployee rocketeer=office.Employees.Find(e=>!e.Dead&&e!=brute&&e!=rifleman&&e.HomeRoom==office.Plan.MeetingRoom);
+                    rocketeer=office.Employees.Find(e=>!e.Dead&&e!=brute&&e!=rifleman&&e.HomeRoom==office.Plan.MeetingRoom);
                     rocketeer.ArmForValidation(Arms.Bazooka);
                     blastsBefore=OfficeWeapons.Explosions;
                     OfficeWeapons.FireRocket(rocketeer,rocketeer.transform.position+Vector3.up*1.4f+rocketeer.transform.forward*.6f,rocketeer.transform.position+rocketeer.transform.forward*8+Vector3.up*1.1f,new System.Random(2));
@@ -234,14 +239,24 @@ namespace TheElevator.Editor
                     OfficeTools.Capture(office.transform,"TestResults/Office/armed-employee.png",gun.position+gun.forward*1.8f+gun.right*.9f+Vector3.up*1.5f,gun.position+Vector3.up*1.1f);
                     victim.Damage(1000,victim.transform.position+Vector3.forward,0);Check(victim.Dead&&!victim.Chasing,"Employees can be knocked out");
                     Check(victim.Robot.Core&&!victim.Robot.Core.isKinematic,"A knocked-out employee goes ragdoll");
-                    // Weapon odds: once furious, each further offence is 2% rifle, 0.5% bazooka.
-                    Check(Mathf.Approximately(OfficeEmployee.RifleChance,.02f)&&Mathf.Approximately(OfficeEmployee.BazookaChance,.005f)
-                        &&OfficeEmployee.WeaponFor(.004)==Arms.Bazooka&&OfficeEmployee.WeaponFor(.02)==Arms.Rifle&&OfficeEmployee.WeaponFor(.03)==Arms.None,"Weapon odds are 2% rifle and 0.5% bazooka");
+                    // Three armed employees per floor: two rifles (2% per offence once furious), one bazooka (1%).
+                    Check(OfficeEmployee.Draws(Arms.Rifle,.019)&&!OfficeEmployee.Draws(Arms.Rifle,.021)&&OfficeEmployee.Draws(Arms.Bazooka,.009)&&!OfficeEmployee.Draws(Arms.Bazooka,.011)&&!OfficeEmployee.Draws(Arms.None,0),"Weapon odds: 2% rifle, 1% bazooka, nobody else");
+                    Check(office.Employees.FindAll(e=>e.Sidearm==Arms.Rifle).Count==2&&office.Employees.FindAll(e=>e.Sidearm==Arms.Bazooka).Count==1,"Exactly two rifle carriers and one bazooka carrier per floor");
+                    Check(Mathf.Approximately(OfficeWeapons.RifleDamage,10)&&Mathf.Approximately(OfficeWeapons.BlastDamage,90)&&Mathf.Approximately(OfficeWeapons.PunchDamage,5),"Employee damage: rifle 10, bazooka 90, fist 5");
                     // Chairs are solid to players (not to employees), and people at work stay solid too.
                     OfficeSeat chair=OfficeSeat.All.Find(s=>s&&s.GetComponent<BoxCollider>());
                     Check(chair&&chair.gameObject.layer==PhysicsLayers.Seats&&!Physics.GetIgnoreLayerCollision(PhysicsLayers.Player,PhysicsLayers.Seats)&&Physics.GetIgnoreLayerCollision(PhysicsLayers.Employees,PhysicsLayers.Seats),"Chairs block players but not employees");
                     OfficeEmployee sitter=office.Employees.Find(e=>!e.Dead&&e.Robot.Seated&&e.AtStation);
                     Check(sitter&&sitter.Motor.enabled,"A seated employee is solid");
+                    // Walking into someone sitting in their chair annoys them.
+                    float seatedBefore=sitter.Anger;Vector3 side=sitter.transform.right;
+                    office.CheckBumps(sitter.transform.position+side*.95f,-side*4);
+                    Check(sitter.Anger>seatedBefore,"Walking into someone in their chair annoys them");
+                    // Knocked out, armed employees drop their weapons for anyone to pick up.
+                    rifleman.Damage(1000,rifleman.transform.position+Vector3.forward,0);rocketeer.Damage(1000,rocketeer.transform.position+Vector3.forward,0);
+                    PlayerWeapon[] loose=UnityEngine.Object.FindObjectsByType<PlayerWeapon>(FindObjectsSortMode.None);
+                    Check(Array.Exists(loose,w=>w.Kind==Arms.Rifle&&w.GetComponent<SalvageItem>())&&Array.Exists(loose,w=>w.Kind==Arms.Bazooka&&w.GetComponent<SalvageItem>()),"Knocked-out employees drop their weapons as pickups");
+                    playerGun=Array.Find(loose,w=>w.Kind==Arms.Rifle);
                     started=Time.time;stage=8;return;
                 }
                 if(stage==8)
@@ -277,6 +292,44 @@ namespace TheElevator.Editor
                     Check(DescentGame.InCabin(teammate.BodyPosition)&&game.BodyShortfall()==0,"Carried into the lift, the body costs nothing");
                     game.Player.DropBody();
                     Check(!teammate.CarriedBy,"The body can be put down");
+                    // Pick up the dropped rifle and line up a shot at a still employee with a clear view.
+                    int sight=~((1<<2)|(1<<8)|(1<<9)|(1<<10));Vector3 spot=Vector3.zero;target=null;
+                    foreach(OfficeEmployee e in office.Employees)
+                    {
+                        if(e.Dead||e.Chasing||e.Travelling||!e.AtStation||e==brute)continue;
+                        for(int k=0;k<8&&!target;k++)
+                        {
+                            Vector3 at=e.transform.position+Quaternion.Euler(0,k*45,0)*Vector3.forward*3.2f;
+                            if(DescentGame.InCabin(at)||!OfficeNavigation.Clear(at)||Physics.Linecast(at+Vector3.up*1.34f,e.transform.position+Vector3.up*1.1f,sight,QueryTriggerInteraction.Ignore))continue;
+                            target=e;spot=at;
+                        }
+                        if(target)break;
+                    }
+                    Check(target,"A clear shot at an employee");
+                    game.Player.Teleport(spot);game.Player.FaceTowards(target.transform.position+Vector3.up*1.1f);game.Player.HealForValidation();
+                    SalvageItem rifleItem=playerGun.GetComponent<SalvageItem>();rifleItem.Body.position=game.Player.transform.position+Vector3.up*1.2f+game.Player.transform.forward*.6f;rifleItem.transform.position=rifleItem.Body.position;
+                    Check(game.Player.PickUp(rifleItem),"The player can pick up a dropped rifle");
+                    started=Time.time;stage=11;return;
+                }
+                if(stage==11)
+                {
+                    game.Player.HealForValidation();
+                    if(Time.time-started<.6f)return;
+                    game.Player.FaceTowards(target.transform.position+Vector3.up*1.1f);
+                    started=Time.time;stage=12;return;
+                }
+                if(stage==12)
+                {
+                    game.Player.HealForValidation();
+                    if(Time.time-started<.2f)return;
+                    playerGun.Operate(game.Player,true,true);
+                    Check(target.Dead,"One round from a player's rifle knocks an employee out");
+                    Check(playerGun.Ammo==OfficeWeapons.RifleMagazine-1,"The rifle uses a round per shot");
+                    // A player's rocket blast is lethal across its radius.
+                    OfficeEmployee far=office.Employees.Find(e=>!e.Dead&&Vector3.Distance(e.transform.position,game.Player.transform.position)>OfficeWeapons.BlastRadius+3);
+                    OfficeWeapons.Explode(office,far.transform.position+Vector3.up*.5f,OfficeWeapons.PlayerBlastDamage);
+                    Check(far.Dead,"A player's bazooka blast knocks out anyone in range");
+                    game.Player.Drop(false);
                     game.Player.Teleport(brute.transform.position+brute.transform.forward*3);game.Player.HealForValidation();
                     game.Player.Damage(1000,game.Player.transform.position+Vector3.forward,0);
                     Check(game.Player.Down&&game.Phase==DescentGame.RunPhase.Lost,"With nobody left standing, being knocked out ends the shift");

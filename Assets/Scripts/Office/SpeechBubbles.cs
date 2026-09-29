@@ -3,7 +3,8 @@ using UnityEngine;
 namespace TheElevator.Office
 {
     // Flat speech bubbles drawn on screen above whoever is talking, so they always face the player's view.
-    // One bubble per speaker, one phrase at a time.
+    // One bubble per speaker, one phrase at a time. Bubbles of people standing close together never overlap:
+    // a bubble that would cover another is lifted above it, with a stem down to its own speaker's head.
     // Calm speech is a white bubble, upset speech is warm orange, and furious yelling is red with bold text.
     public static class SpeechBubbles
     {
@@ -28,10 +29,28 @@ namespace TheElevator.Office
                 if (Physics.Linecast(eye, anchor, ~((1 << 2) | (1 << 8)), QueryTriggerInteraction.Ignore)) continue;
                 visible.Add(new KeyValuePair<float, OfficeEmployee>(distance, employee));
             }
-            // Far bubbles first, so nearer ones draw on top.
-            visible.Sort((a, b) => b.Key.CompareTo(a.Key));
-            foreach (var entry in visible) Bubble(view, entry.Value, entry.Key);
+            // Lay out nearest first (they keep their natural spot), then lift anything that would overlap.
+            visible.Sort((a, b) => a.Key.CompareTo(b.Key));
+            placed.Clear();
+            foreach (var entry in visible)
+            {
+                Rect box = Measure(view, entry.Value, entry.Key, out Vector2 anchor, out GUIContent content, out float scale);
+                for (int pass = 0; pass < 8; pass++)
+                {
+                    bool moved = false;
+                    foreach (Placed other in placed)
+                        if (Grow(other.Box, 4).Overlaps(box)) { box.y = other.Box.y - box.height - 8 * scale; moved = true; }
+                    if (!moved) break;
+                }
+                placed.Add(new Placed { Employee = entry.Value, Box = box, Anchor = anchor, Content = content, Scale = scale });
+            }
+            // Draw far to near, so nearer bubbles sit on top.
+            for (int i = placed.Count - 1; i >= 0; i--) Draw(placed[i]);
         }
+
+        struct Placed { public OfficeEmployee Employee; public Rect Box; public Vector2 Anchor; public GUIContent Content; public float Scale; }
+        static readonly List<Placed> placed = new List<Placed>();
+        static Rect Grow(Rect r, float by) { return new Rect(r.x - by, r.y - by, r.width + by * 2, r.height + by * 2); }
 
         static Vector3 Anchor(OfficeEmployee employee)
         {
@@ -39,22 +58,38 @@ namespace TheElevator.Office
             return (head ? head.position : employee.transform.position + Vector3.up * 1.35f) + Vector3.up * HeadClearance;
         }
 
-        static void Bubble(Camera view, OfficeEmployee employee, float distance)
+        static void Style(OfficeVoice.Tone tone, float scale)
         {
-            Vector3 screen = view.WorldToScreenPoint(Anchor(employee));
-            float ui = Mathf.Max(.75f, Screen.height / 1080f);
-            float scale = Mathf.Clamp(6f / Mathf.Max(1, distance), .55f, 1.15f) * ui;
-            OfficeVoice.Tone tone = employee.SpeechTone;
             style.fontSize = Mathf.RoundToInt((tone == OfficeVoice.Tone.Yelling ? 21 : 18) * scale);
             style.fontStyle = tone == OfficeVoice.Tone.Yelling ? FontStyle.Bold : FontStyle.Normal;
             style.padding = new RectOffset(Mathf.RoundToInt(12 * scale), Mathf.RoundToInt(12 * scale), Mathf.RoundToInt(8 * scale), Mathf.RoundToInt(8 * scale));
-            string text = tone == OfficeVoice.Tone.Yelling ? employee.Speech.ToUpperInvariant() : employee.Speech;
-            GUIContent content = new GUIContent(text);
+        }
+
+        // Where a bubble would naturally go (just above the head) and how big it is.
+        static Rect Measure(Camera view, OfficeEmployee employee, float distance, out Vector2 anchor, out GUIContent content, out float scale)
+        {
+            Vector3 screen = view.WorldToScreenPoint(Anchor(employee));
+            float ui = Mathf.Max(.75f, Screen.height / 1080f);
+            scale = Mathf.Clamp(6f / Mathf.Max(1, distance), .55f, 1.15f) * ui;
+            OfficeVoice.Tone tone = employee.SpeechTone;
+            Style(tone, scale);
+            content = new GUIContent(tone == OfficeVoice.Tone.Yelling ? employee.Speech.ToUpperInvariant() : employee.Speech);
             float width = Mathf.Min(style.CalcSize(content).x, 300 * scale);
             float height = style.CalcHeight(content, width);
-            float x = screen.x, y = Screen.height - screen.y;
+            anchor = new Vector2(screen.x, Screen.height - screen.y);
+            return new Rect(anchor.x - width * .5f, anchor.y - height - 12 * scale, width, height);
+        }
+
+        static void Draw(Placed bubble)
+        {
+            OfficeEmployee employee = bubble.Employee;
+            float scale = bubble.Scale;
+            OfficeVoice.Tone tone = employee.SpeechTone;
+            Style(tone, scale);
+            GUIContent content = bubble.Content;
+            Rect box = bubble.Box;
+            float x = bubble.Anchor.x, y = bubble.Anchor.y;
             float tail = 12 * scale;
-            Rect box = new Rect(x - width * .5f, y - height - tail, width, height);
             Color fill = tone == OfficeVoice.Tone.Yelling ? new Color(1f, .78f, .74f) : tone == OfficeVoice.Tone.Upset ? new Color(1f, .9f, .74f) : new Color(.99f, .99f, .97f);
             Color edge = tone == OfficeVoice.Tone.Yelling ? new Color(.75f, .12f, .1f) : tone == OfficeVoice.Tone.Upset ? new Color(.85f, .5f, .15f) : new Color(.2f, .22f, .26f);
             // Fade out over the last moment of the line.
@@ -63,6 +98,8 @@ namespace TheElevator.Office
             // Outline, body and a little tail pointing at the speaker's head.
             float border = Mathf.Max(1.5f, 2.5f * scale);
             GUI.color = new Color(edge.r, edge.g, edge.b, alpha);
+            // Lifted above a neighbour's bubble: a stem runs down to this speaker's head.
+            if (box.yMax < y - tail - 1) GUI.DrawTexture(new Rect(x - border * .6f, box.yMax, border * 1.2f, y - tail - box.yMax), Texture2D.whiteTexture);
             GUI.Box(new Rect(box.x - border, box.y - border, box.width + border * 2, box.height + border * 2), GUIContent.none, frame);
             Matrix4x4 matrix = GUI.matrix;
             GUIUtility.RotateAroundPivot(45, new Vector2(x, y - tail * 1.1f));
