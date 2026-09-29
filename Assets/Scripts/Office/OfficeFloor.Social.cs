@@ -6,7 +6,6 @@ namespace TheElevator.Office
     public sealed partial class OfficeFloor
     {
         public OfficeKeycard DeskKeycard { get; private set; }
-        readonly Dictionary<int,float> meetingCooldown=new Dictionary<int,float>();
         public float SuspicionLevel
         {
             get { float level=SecurityAlert;foreach(OfficeEmployee e in Employees)level=Mathf.Max(level,e.Suspicion);return level; }
@@ -115,16 +114,30 @@ namespace TheElevator.Office
             return Kit.MeetingBoard.TransformPoint(Vector3.Lerp(a,b,blend));
         }
         bool playerInMeeting;
-        // Walking into the meeting turns every head, and each attendee gets angrier the longer you stay.
+        // Walking into the meeting is allowed: nobody gets upset, the player just hears the presentation.
         public void CheckMeetingEntry(float dt)
         {
             if(Plan.MeetingRoom<0||!Game)return;
-            bool inside=Map.NearestRoom(Game.Player.transform.position).Id==Plan.MeetingRoom;
-            if(inside&&!playerInMeeting)InterruptMeeting();
-            playerInMeeting=inside;
-            if(!inside)return;
+            playerInMeeting=Map.NearestRoom(Game.Player.transform.position).Id==Plan.MeetingRoom;
+        }
+        readonly HashSet<OfficeEmployee> touching=new HashSet<OfficeEmployee>();
+        // Bumping: walking into an employee (seated or standing) raises that one employee's anger by one level.
+        // Each contact counts once; step away and walk into them again to bump again.
+        public int CheckBumps(Vector3 position,Vector3 motion)
+        {
+            int bumps=0;
             foreach(OfficeEmployee employee in Employees)
-                if(employee.HomeRoom==Plan.MeetingRoom&&!employee.Travelling)employee.Glare(dt*2.5f);
+            {
+                Vector3 delta=employee.transform.position-position;float height=delta.y;delta.y=0;float gap=delta.magnitude;
+                bool contact=gap<.74f&&Mathf.Abs(height)<1;
+                if(contact&&!touching.Contains(employee))
+                {
+                    touching.Add(employee);
+                    if(motion.magnitude>.5f&&Vector3.Dot(motion.normalized,delta.normalized)>.3f){employee.Bump();bumps++;}
+                }
+                else if(!contact&&gap>.95f)touching.Remove(employee);
+            }
+            return bumps;
         }
         public string MeetingLine
         {
@@ -133,14 +146,6 @@ namespace TheElevator.Office
                 string[] lines={"The productivity target is now one hundred and twelve percent.","Should we schedule a meeting to discuss fewer meetings?","That request requires a separate approval meeting.","Please remember: all personal time is company property."};
                 return lines[(int)(Time.time/5)%lines.Length];
             }
-        }
-        void InterruptMeeting()
-        {
-            int room=Plan.MeetingRoom;
-            if(meetingCooldown.TryGetValue(room,out float until)&&Time.time<until)return;
-            int count=0;foreach(OfficeEmployee employee in Employees)
-                if(employee.Station&&employee.Station.RoomId==room&&!employee.Travelling){employee.React(22,"This meeting is private. Can we help you?");count++;}
-            if(count>0)meetingCooldown[room]=Time.time+20;
         }
         void AddRoomDoors()
         {
@@ -192,7 +197,7 @@ namespace TheElevator.Office
                 Kit.A.Box(reader,"Operable door button",Vector3.zero,new Vector3(.2f,.28f,.06f),Kit.A.Dark,true);
                 Kit.A.Box(reader,"Door control lamp",new Vector3(0,.065f,-.035f),new Vector3(.14f,.03f,.01f),locked?Kit.A.WarmLight:Kit.A.Screen);
                 Transform sign=Kit.A.Group(frame,"Door sign",new Vector3(0,(top+3.2f)/2,face*.08f),face<0?0:180);
-                Kit.A.Label(sign,meeting?"MEETING IN PROGRESS":locked?"CONTROLLED ASSET":DoorName(face<0?bId:aId),Vector3.zero,.03f);
+                Kit.A.Label(sign,meeting?"MEETING IN PROGRESS":locked?"AUTHORIZED PERSONNEL":DoorName(face<0?bId:aId),Vector3.zero,.03f);
             }
             door.SetOpenForValidation(false);
             Doors.Add(door);

@@ -167,7 +167,7 @@ namespace TheElevator
             }
             else
             {
-                Text(new Rect(x, 165, 560, 210), "WASD   Move       MOUSE   Look\nSHIFT   Sprint       SPACE   Jump\nE   Interact / carry       Q   Throw\nF   Connect held battery inside lift\nR   Depart early       L   Flashlight\nF3   Generation debug       ESC   Resume\n\nExplore, record remote surveys, and return to the lift.", body);
+                Text(new Rect(x, 165, 560, 235), "WASD   Move       MOUSE   Look\nSHIFT   Sprint       SPACE   Jump\nE   Interact / carry / sit       HOLD Q   Throw\nHOLD MOUSE   Use item (spray)\nF   Connect held battery inside lift\nR   Depart early       L   Flashlight\nF3   Generation debug       ESC   Resume\nExplore, record remote surveys, and return to the lift.", body);
             }
             if (Button(new Rect(x, 410, 560, 52), ended ? "CLOCK IN AGAIN" : "BACK TO WORK", Workshop.Yellow))
             { if (ended) game.Restart(); else game.SetPaused(false); }

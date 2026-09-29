@@ -13,6 +13,9 @@ namespace TheElevator.Office
         // Quadrant centres and the wall-centre slot sit clear of the 3 m cross through the middle of the cell.
         const float Quadrant = 3.75f, WallSlot = 5.0f;
 
+        // Where wall-mounted fire extinguishers hang; OfficeFloor turns each into a pickup.
+        public readonly List<Transform> ExtinguisherMounts = new List<Transform>();
+
         Edge[] Edges(MapRoom room)
         {
             Edge[] edges = new Edge[4];
@@ -139,17 +142,18 @@ namespace TheElevator.Office
                     case OfficeRoomKind.Restroom: Washroom(WallGroup(geometry, side, "Washbasins", 5.0f)); usedWalls.Add(side); break;
                 }
             }
-            WallDetails(geometry, room, info, walls, usedWalls, doors);
+            WallDetails(geometry, room, info, walls, usedWalls, doors, height);
         }
 
         // Wall-mounted details only ever go on solid walls: signs, clock, fire point, notices and a display.
-        void WallDetails(Transform geometry, MapRoom room, OfficeRoomPlan info, List<int> walls, HashSet<int> usedWalls, List<int> doors)
+        void WallDetails(Transform geometry, MapRoom room, OfficeRoomPlan info, List<int> walls, HashSet<int> usedWalls, List<int> doors, float height)
         {
             if (walls.Count == 0) return;
             Transform first = A.Group(geometry, "Wall details", Vector3.zero, walls[0] * 90);
-            Clock(first);
-            Safety(A.Group(first, "Safety station", new Vector3(2.55f,0,5.72f)));
-            DepartmentPlaque(first, info, room.Id);
+            Clock(first, height);
+            // One room in four keeps a fire extinguisher on a wall bracket; the extinguisher itself is a pickup.
+            if (new System.Random(unchecked(floor.Manifest.Recipe.Seed * 7349 + room.Id * 104729)).NextDouble() < .25)
+                ExtinguisherBracket(A.Group(first, "Fire extinguisher point", new Vector3(2.55f,0,5.74f)));
             foreach (int side in walls)
             {
                 if (usedWalls.Contains(side)) continue;
@@ -175,7 +179,8 @@ namespace TheElevator.Office
             // Monitors face the shared screen in the middle; chairs sit on the outside.
             Desk(A.Group(t, "Workstation front", new Vector3(0,0,-.95f)), room, false);
             Desk(A.Group(t, "Workstation back", new Vector3(0,0,.95f), 180), room, false);
-            A.Box(t, "Desk screen", new Vector3(0,1.05f,0), new Vector3(2.1f,.5f,.06f), A.Upholstery);
+            // The shared screen stands on the floor between the two desks.
+            A.Box(t, "Desk screen", new Vector3(0,.65f,0), new Vector3(2.1f,1.3f,.06f), A.Upholstery, true);
         }
 
         void LoungeSeating(Transform t, int room)
@@ -189,9 +194,11 @@ namespace TheElevator.Office
             for (int side = -1; side <= 1; side += 2)
             {
                 Transform chair = A.Group(t, "Armchair", new Vector3(side * .75f,0,.3f), side * -15);
-                A.Box(chair, "Armchair seat", new Vector3(0,.38f,0), new Vector3(.85f,.36f,.8f), A.Upholstery, true);
-                A.Box(chair, "Armchair back", new Vector3(0,.72f,.34f), new Vector3(.85f,.55f,.16f), A.Upholstery);
-                for (int arm = -1; arm <= 1; arm += 2) A.Box(chair, "Armchair arm", new Vector3(arm * .4f,.58f,0), new Vector3(.12f,.3f,.78f), A.Wood);
+                // Seat block, back and arms all stand on the floor.
+                A.Box(chair, "Armchair seat", new Vector3(0,BeanRig.SeatSurface * .5f,0), new Vector3(.85f,BeanRig.SeatSurface,.8f), A.Upholstery, true);
+                A.Box(chair, "Armchair back", new Vector3(0,.48f,.34f), new Vector3(.85f,.96f,.16f), A.Upholstery);
+                for (int arm = -1; arm <= 1; arm += 2) A.Box(chair, "Armchair arm", new Vector3(arm * .4f,.32f,0), new Vector3(.12f,.64f,.78f), A.Wood);
+                A.Group(chair, "Armchair place", new Vector3(0,0,-.02f), 180).gameObject.AddComponent<OfficeSeat>();
             }
             A.Round(t, "Side table", new Vector3(0,.28f,.6f), new Vector3(.45f,.28f,.45f), A.Wood);
             Mug(t, new Vector3(0,.56f,.6f));
@@ -223,9 +230,16 @@ namespace TheElevator.Office
             for (int i = 0; i < 2; i++)
             {
                 Transform stall = A.Group(t, "Toilet stall", new Vector3(-.55f + i * 1.1f,0,.2f));
-                for (int side = -1; side <= 1; side += 2) A.Box(stall, "Stall partition", new Vector3(side * .54f,1.0f,0), new Vector3(.05f,1.8f,1.5f), A.Plastic, true);
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    A.Box(stall, "Stall partition", new Vector3(side * .54f,1.0f,0), new Vector3(.05f,1.8f,1.5f), A.Plastic, true);
+                    // Partitions stand on short metal feet, like real washroom cubicles.
+                    for (int foot = -1; foot <= 1; foot += 2) A.Box(stall, "Partition foot", new Vector3(side * .54f,.06f,foot * .6f), new Vector3(.07f,.12f,.07f), A.Metal);
+                }
                 A.Box(stall, "Stall door", new Vector3(0,1.0f,-.74f), new Vector3(1.0f,1.75f,.04f), A.Plastic, true);
-                A.Round(stall, "Toilet", new Vector3(0,.22f,.35f), new Vector3(.4f,.22f,.55f), A.Paper, PrimitiveType.Sphere);
+                A.Round(stall, "Toilet pedestal", new Vector3(0,.2f,.4f), new Vector3(.3f,.2f,.38f), A.Paper);
+                A.Round(stall, "Toilet bowl", new Vector3(0,.4f,.35f), new Vector3(.42f,.08f,.55f), A.Paper);
+                A.Box(stall, "Toilet cistern", new Vector3(0,.6f,.66f), new Vector3(.4f,.4f,.16f), A.Paper);
             }
         }
 
@@ -258,8 +272,8 @@ namespace TheElevator.Office
             A.Box(t, "Media console", new Vector3(0,.3f,0), new Vector3(2.2f,.6f,.5f), A.Wood, true);
             A.Box(t, "Wall screen frame", new Vector3(0,1.65f,.23f), new Vector3(2.3f,1.3f,.06f), A.Dark);
             A.Box(t, "Wall screen", new Vector3(0,1.65f,.19f), new Vector3(2.15f,1.15f,.02f), A.Screen);
-            A.Label(t, "MORROW NEWS / 24H", new Vector3(0,1.95f,.175f), .04f);
-            A.Label(t, "SHARE PRICE UP. MORALE UNDER REVIEW.", new Vector3(0,1.55f,.175f), .024f);
+            A.Label(t, "MORROW NEWS", new Vector3(0,1.95f,.175f), .04f);
+            A.Label(t, "MARKETS  /  WEATHER  /  TRAFFIC", new Vector3(0,1.55f,.175f), .024f);
             Plant(t, new Vector3(1.4f,0,.1f));
         }
 
@@ -273,29 +287,24 @@ namespace TheElevator.Office
             A.Box(t, "Water cooler stand", new Vector3(1.05f,.5f,0), new Vector3(.36f,1.0f,.36f), A.Plastic, true);
         }
 
-        void Clock(Transform wall)
+        // The clock hangs well below the ceiling trim, between the wall centre and the acoustic panel.
+        void Clock(Transform wall, float height)
         {
-            Transform clock = A.Group(wall, "Department clock", new Vector3(-2.55f,3.25f,5.8f));
-            A.Round(clock, "Clock face", Vector3.zero, new Vector3(.9f,.9f,.06f), A.Paper, PrimitiveType.Sphere);
-            A.W.Soft.Ring(clock, "Plum clock rim", Vector3.zero, .45f, .045f, A.W.Soft.Plum);
-            A.Box(clock, "Minute hand", new Vector3(.08f,.09f,-.05f), new Vector3(.055f,.34f,.02f), A.Red).transform.localRotation = Quaternion.Euler(0,0,-32);
-            A.Box(clock, "Hour hand", new Vector3(-.08f,0,-.06f), new Vector3(.23f,.065f,.02f), A.Dark);
+            Transform clock = A.Group(wall, "Department clock", new Vector3(-2.05f,Mathf.Min(2.45f,height - .75f),5.83f));
+            A.Round(clock, "Clock face", Vector3.zero, new Vector3(.7f,.7f,.05f), A.Paper, PrimitiveType.Sphere);
+            A.W.Soft.Ring(clock, "Plum clock rim", Vector3.zero, .35f, .035f, A.W.Soft.Plum);
+            A.Box(clock, "Minute hand", new Vector3(.06f,.07f,-.04f), new Vector3(.045f,.27f,.015f), A.Red).transform.localRotation = Quaternion.Euler(0,0,-32);
+            A.Box(clock, "Hour hand", new Vector3(-.06f,0,-.045f), new Vector3(.18f,.05f,.015f), A.Dark);
         }
 
-        // Extinguisher on its backing board; the sign sits on the board.
-        void Safety(Transform safety)
+        // A backing plate and cradle on the wall. The extinguisher that hangs in the cradle is spawned by the floor
+        // as a pickup at ExtinguisherMounts; the mount's -Z faces into the room, as does the extinguisher's gauge.
+        void ExtinguisherBracket(Transform point)
         {
-            A.Box(safety,"Fire equipment backing",new Vector3(0,1.2f,0),new Vector3(.5f,1.2f,.055f),A.Dark);
-            A.Round(safety,"Extinguisher tank",new Vector3(0,.95f,-.15f),new Vector3(.24f,.26f,.24f),A.Red);
-            A.Box(safety,"Extinguisher grip",new Vector3(0,1.28f,-.15f),new Vector3(.2f,.05f,.07f),A.Metal);
-            A.Box(safety,"Extinguisher hose",new Vector3(.14f,1.06f,-.15f),new Vector3(.035f,.39f,.035f),A.Dark);
-            A.Label(safety,"FIRE\nAND OTHER FEELINGS",new Vector3(0,1.64f,-.035f),.021f);
-        }
-
-        void DepartmentPlaque(Transform wall, OfficeRoomPlan info, int room)
-        {
-            A.Box(wall, "Department plaque", new Vector3(-2.55f,2.35f,5.83f), new Vector3(1.55f,.42f,.05f), A.Dark);
-            A.Label(wall, "M / " + OfficePlan.Departments[info.Department] + "\n" + KindName(info.Kind) + "  " + room.ToString("000"), new Vector3(-2.55f,2.35f,5.8f), .031f);
+            A.Box(point, "Extinguisher backing plate", new Vector3(0,1.02f,-.03f), new Vector3(.34f,.72f,.04f), A.Dark);
+            A.Box(point, "Extinguisher cradle", new Vector3(0,.72f,-.1f), new Vector3(.24f,.04f,.14f), A.Metal);
+            A.Box(point, "Extinguisher strap", new Vector3(0,1.14f,-.1f), new Vector3(.26f,.035f,.14f), A.Metal);
+            ExtinguisherMounts.Add(A.Group(point, "Extinguisher mount", new Vector3(0,.74f,-.16f)));
         }
 
         void CorporateDisplay(Transform wall, int room)
@@ -303,8 +312,8 @@ namespace TheElevator.Office
             Transform display = A.Group(wall, "Corporate communications", new Vector3(0,0,5.8f));
             A.Box(display, "Corporate display frame", new Vector3(0,2.2f,0), new Vector3(2.25f,1.05f,.08f), A.Dark);
             A.Box(display, "Corporate display", new Vector3(0,2.2f,-.045f), new Vector3(2.1f,.91f,.018f), A.Screen);
-            A.Label(display, room == 0 ? Plan.Config.Corporation : "PRODUCTIVITY / " + (91 + room % 9) + "%", new Vector3(0,2.43f,-.06f), .055f);
-            A.Label(display, room % 3 == 0 ? "YOUR BREAK HAS BEEN OPTIMIZED." : "PLEASE ENJOY YOUR ASSIGNED PURPOSE.", new Vector3(0,2.1f,-.06f), .025f);
+            A.Label(display, Plan.Config.Corporation, new Vector3(0,2.43f,-.06f), .055f);
+            A.Label(display, room == 0 ? "WELCOME" : "TOWN HALL  /  FRIDAY 16:00", new Vector3(0,2.1f,-.06f), .025f);
         }
 
         void Noticeboard(Transform wall, int room, OfficeRoomPlan info)
@@ -312,7 +321,7 @@ namespace TheElevator.Office
             Transform board = A.Group(wall, "Noticeboard", new Vector3(0,0,5.8f));
             A.Box(board, "Noticeboard surround", new Vector3(0,1.95f,0), new Vector3(2.35f,1.3f,.06f), A.Wood);
             A.Box(board, "Noticeboard felt", new Vector3(0,1.95f,-.04f), new Vector3(2.23f,1.18f,.02f), A.Upholstery);
-            string[] notices = { "MANDATORY JOY\nTHURSDAY / 09:00", "LOST: ONE HAND\nRETURN TO HR", "SAFETY RECORD\n003 DAYS", "COFFEE IS A\nREVOCABLE PRIVILEGE", "PROMOTION LIST\nPENDING FOREVER", "REMEMBER TO\nRECHARGE" };
+            string[] notices = { "FIRE DRILL\nTHURSDAY 10:00", "TEAM LUNCH\nFRIDAY", "PLEASE KEEP THE\nKITCHEN CLEAN", "QUARTERLY\nREVIEWS DUE", "WELLNESS\nWEEK", "PARKING\nNOTICE" };
             for (int i = 0; i < 3; i++)
             {
                 Transform sheet = A.Group(board, "Pinned notice", new Vector3(-.72f + i * .72f,1.96f,-.06f));
@@ -324,17 +333,5 @@ namespace TheElevator.Office
             }
         }
 
-        static string KindName(OfficeRoomKind kind)
-        {
-            switch (kind)
-            {
-                case OfficeRoomKind.Workroom: return "OPEN OFFICE";
-                case OfficeRoomKind.Executive: return "PRIVATE OFFICE";
-                case OfficeRoomKind.Lounge: return "STAFF LOUNGE";
-                case OfficeRoomKind.Breakroom: return "COFFEE BAR";
-                case OfficeRoomKind.Conference: return "BOARDROOM";
-                default: return kind.ToString().ToUpper();
-            }
-        }
     }
 }

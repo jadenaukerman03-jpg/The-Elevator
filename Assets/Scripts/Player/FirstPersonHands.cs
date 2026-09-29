@@ -45,9 +45,11 @@ namespace TheElevator
             go.AddComponent<MeshFilter>().sharedMesh=mesh;MeshRenderer renderer=go.AddComponent<MeshRenderer>();renderer.sharedMaterial=material;
             renderer.shadowCastingMode=UnityEngine.Rendering.ShadowCastingMode.Off;return renderer;
         }
+        public const string ExtinguisherGrip="CANISTER AND NOZZLE";
         public static string GripFor(SalvageItem item)
         {
             if(item.IsBattery)return "BATTERY CRADLE";
+            if(item.GetComponent<FireExtinguisher>())return ExtinguisherGrip;
             string name=item.Title.ToLowerInvariant();
             if(name.Contains("computer")||name.Contains("terminal"))return "MONITOR SIDE GRIP";
             if(name.Contains("award")||name.Contains("artifact"))return "PEDESTAL SUPPORT";
@@ -71,10 +73,13 @@ namespace TheElevator
             Vector3 bend=BeanRig.RelaxedHand;
             if(held&&shape)
             {
-                Grip(side,held,shape,out Vector3 gripPosition,out Quaternion gripRotation);
+                Vector3 gripPosition;Quaternion gripRotation;
+                FireExtinguisher extinguisher=GripName==ExtinguisherGrip&&side>0?held.GetComponent<FireExtinguisher>():null;
+                if(extinguisher)NozzleGrip(extinguisher.Nozzle,out gripPosition,out gripRotation);
+                else Grip(side,held,shape,out gripPosition,out gripRotation);
                 float t=Mathf.SmoothStep(0,1,reach);
                 position=Vector3.Lerp(position,gripPosition,t);rotation=Quaternion.Slerp(rotation,gripRotation,t);
-                bend=Vector3.Lerp(BeanRig.RelaxedHand,WrapHand,Mathf.SmoothStep(0,1,Mathf.InverseLerp(.5f,1,reach)));
+                bend=Vector3.Lerp(BeanRig.RelaxedHand,extinguisher?BeanRig.GripHand:WrapHand,Mathf.SmoothStep(0,1,Mathf.InverseLerp(.5f,1,reach)));
             }
             hand.Root.SetPositionAndRotation(position,rotation);
             if((bend-hand.Bend).sqrMagnitude>.25f){hand.Bend=bend;BeanRig.Mitten(hand.Mesh,bend,side);}
@@ -95,13 +100,20 @@ namespace TheElevator
             // The monitor's physics box includes its deep stand. Grip the thin display shell itself.
             if(GripName=="MONITOR SIDE GRIP" && item.GetComponent<OfficeEquipment>())
             {extent=new Vector3(.325f,.201f,.021f);center=new Vector3(0,.37f,0);}
-            float y=GripName=="BATTERY CRADLE"?-extent.y*.35f:GripName=="PEDESTAL SUPPORT"?-extent.y*.65f:GripName=="SMALL DEVICE PINCH"?0:extent.y*.05f;
+            float y=GripName==ExtinguisherGrip?extent.y*.2f:GripName=="BATTERY CRADLE"?-extent.y*.35f:GripName=="PEDESTAL SUPPORT"?-extent.y*.65f:GripName=="SMALL DEVICE PINCH"?0:extent.y*.05f;
             Transform t=item.transform;
             rotation=Quaternion.LookRotation(t.TransformDirection(new Vector3(-side,0,0)),t.TransformDirection(Vector3.back));
             position=t.TransformPoint(center+new Vector3(side*(extent.x+PalmHalfThickness),y,-extent.z+FingerHinge));
             // Contact check: the fold line must sit exactly on the collider's near vertical edge.
             Vector3 hinge=t.InverseTransformPoint(position+rotation*new Vector3(0,FingerHinge,PalmHalfThickness))-center;
             MaxContactError=Mathf.Max(MaxContactError,Mathf.Abs(hinge.z+extent.z)+Mathf.Abs(Mathf.Abs(hinge.x)-extent.x));
+        }
+        // Right hand on the nozzle like holding a torch: the wrist comes from behind, the palm lies along the
+        // nozzle's right side and the fingers curl over it toward the horn.
+        static void NozzleGrip(Transform nozzle,out Vector3 position,out Quaternion rotation)
+        {
+            rotation=Quaternion.LookRotation(nozzle.TransformDirection(Vector3.left),nozzle.TransformDirection(new Vector3(0,.3f,1)));
+            position=nozzle.TransformPoint(new Vector3(.016f+PalmHalfThickness,-.01f,-.075f));
         }
         void OnDestroy()
         {

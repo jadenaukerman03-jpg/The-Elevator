@@ -47,9 +47,9 @@ namespace TheElevator
             rig.SetFirstPerson(firstPerson);
         }
 
-        public void Animate(float speed, bool carrying, float dt)
+        public void Animate(float speed, bool carrying, float dt, bool seated = false)
         {
-            rig.Animate(dt, new BeanPose { Speed = speed, Carrying = carrying, ElbowBend = -12 });
+            rig.Animate(dt, new BeanPose { Speed = speed, Carrying = carrying, Seated = seated, ElbowBend = -12 });
         }
     }
 }

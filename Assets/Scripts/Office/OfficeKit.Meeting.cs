@@ -48,13 +48,13 @@ namespace TheElevator.Office
             Transform board=A.Group(m,"Presentation board",new Vector3(0,0,cell+5.84f));
             A.Box(board,"Board frame",new Vector3(0,BoardHeight,0),new Vector3(4.8f,2.3f,.06f),A.Dark);
             A.Box(board,"Board surface",new Vector3(0,BoardHeight,-.035f),new Vector3(4.6f,2.1f,.012f),A.Paper);
-            A.Label(board,"Q4 ROADMAP / INCREASE THE INCREASE",new Vector3(0,2.62f,-.045f),.05f,Color.black);
+            A.Label(board,"Q4 ROADMAP",new Vector3(0,2.62f,-.045f),.05f,Color.black);
             for(int i=0;i<6;i++)
             {
                 float bar=.25f+i*.2f;
                 A.Box(board,"Chart bar",new Vector3(-1.4f+i*.56f,1.05f+bar*.5f,-.045f),new Vector3(.34f,bar,.012f),i==5?A.Red:A.DepartmentAccents[i%A.DepartmentAccents.Length]);
             }
-            A.Label(board,"PROFIT   /   MORALE   /   MORE PROFIT",new Vector3(0,.92f,-.045f),.026f,Color.black);
+            A.Label(board,"JAN       FEB       MAR       APR       MAY       JUN",new Vector3(0,.92f,-.045f),.026f,Color.black);
             MeetingBoard=board;
             // The presenter stands beside the board with it on their right, half turned toward the table.
             Task(m,room,OfficeTask.Present,new Vector3(1.9f,0,cell+4.9f),false,215);

@@ -69,8 +69,16 @@ namespace TheElevator
             else if(grip=="SMALL DEVICE PINCH")rotation*=Quaternion.Euler(12,0,-8);
             float duration=grip=="SMALL DEVICE PINCH"?.22f:grip=="BATTERY CRADLE"?.44f:.34f;
             float blend=Mathf.SmoothStep(0,1,Mathf.Clamp01((Time.time-pickupTime)/duration));
+            Vector3 target=origin+forward*distance;
+            if(grip==FirstPersonHands.ExtinguisherGrip)
+            {
+                // Carried low on the left by its body; the right hand is free for the nozzle.
+                Transform view=carrier.View.transform;
+                target=view.TransformPoint(new Vector3(-.25f,-.37f,Mathf.Min(.52f,distance)));
+                rotation=view.rotation*Quaternion.Euler(-6,12,0);
+            }
             Quaternion pose=Quaternion.Slerp(pickupRotation,rotation,blend);
-            Body.MovePosition(Vector3.Lerp(pickupPosition,origin+forward*distance-pose*heldCenter,blend));
+            Body.MovePosition(Vector3.Lerp(pickupPosition,target-pose*heldCenter,blend));
             Body.MoveRotation(pose);
         }
         public static float ThrowSpeed(float mass,float charge)

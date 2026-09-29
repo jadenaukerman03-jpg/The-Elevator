@@ -39,7 +39,9 @@ namespace TheElevator
         public static readonly Color Shoes = new Color(.17f,.15f,.15f);
         public static readonly Vector3 HeadCenter = new Vector3(0,.27f,0), HeadRadii = new Vector3(.34f,.31f,.31f);
 
-        const float Scale = 1.1f, HipHeight = .52f, SeatedHip = .50f;
+        // Every seat surface in the office is 0.46 m high; the seated hip rests the bottom of the torso on it.
+        public const float SeatSurface = .46f;
+        const float Scale = 1.1f, HipHeight = .52f, SeatedHip = SeatSurface / Scale + .12f;
         const float UpperArm = .24f, Forearm = .22f, Thigh = .20f, Shin = .19f;
         static readonly Vector2[] TorsoProfile = {
             new Vector2(0,.44f), new Vector2(.10f,.43f), new Vector2(.16f,.39f), new Vector2(.19f,.30f),
@@ -351,12 +353,15 @@ namespace TheElevator
             phase = (phase + dt * cycles * Mathf.PI * 2) % (Mathf.PI * 200);
             float s = Mathf.Sin(phase), c = Mathf.Cos(phase), breathe = Mathf.Sin(clock * 1.7f + identity);
             float shift = Mathf.Sin(clock * .55f + identity * 1.3f) * idle * (1 - seat);
-            seat = Mathf.MoveTowards(seat, pose.Seated ? 1 : 0, dt * 2.6f);
+            seat = Mathf.MoveTowards(seat, pose.Seated ? 1 : 0, dt * 1.8f);
+            // Sitting down: the hips drop into a squat while the torso tips forward for balance, then settle back
+            // onto the seat. Standing up plays the same motion in reverse, pushing off forward.
+            float sit = Mathf.SmoothStep(0, 1, seat), settle = Mathf.Sin(seat * Mathf.PI);
 
             float bounce = walk * Mathf.Abs(c) * Mathf.Lerp(.018f, .045f, run);
-            float lean = walk * Mathf.Lerp(4, 15, run) * (1 - seat) + (pose.Carrying ? 4 : 0);
+            float lean = walk * Mathf.Lerp(4, 15, run) * (1 - seat) + (pose.Carrying ? 4 : 0) + settle * 24 - sit * 4;
             float twist = s * walk * Mathf.Lerp(5, 9, run);
-            pelvis.localPosition = new Vector3(shift * .012f, Mathf.Lerp(HipHeight - run * .03f + bounce, SeatedHip, seat) + breathe * .004f, 0);
+            pelvis.localPosition = new Vector3(shift * .012f, Mathf.Lerp(HipHeight - run * .03f + bounce, SeatedHip, sit) - settle * .03f + breathe * .004f, 0);
             pelvis.localRotation = Quaternion.Euler(lean, twist, s * walk * 3 + shift * 1.6f);
             PoseLeg(hipL, kneeL, ankleL, s, c, walk, run, Mathf.Max(0, shift));
             PoseLeg(hipR, kneeR, ankleR, -s, -c, walk, run, Mathf.Max(0, -shift));
@@ -374,6 +379,13 @@ namespace TheElevator
                 float bend = pose.Carrying ? -35 : pose.ElbowBend + Mathf.Lerp(-6, -78, run) * walk - Mathf.Max(0, -armSwing) * Mathf.Lerp(10, 18, run) + sway * 3;
                 if (pose.Typing) bend += Mathf.Sin(clock * 14 + side) * 3;
                 if (talking && side > 0) { arm = Quaternion.Euler(-25, 0, 12); bend = -70 + Mathf.Sin(clock * 4) * 14; }
+                else if (!pose.Carrying && !pose.Typing && !pose.Reaching && seat > 0)
+                {
+                    // Hands reach back and out for the seat on the way down, then come to rest on the lap.
+                    Quaternion lap = Quaternion.Euler(-28, 0, side * 10), brace = Quaternion.Euler(22, 0, side * 24);
+                    arm = Quaternion.Slerp(arm, Quaternion.Slerp(lap, brace, settle), seat);
+                    bend = Mathf.Lerp(bend, Mathf.Lerp(-55, -20, settle), seat);
+                }
                 shoulder.localRotation = Quaternion.Slerp(shoulder.localRotation, arm, follow);
                 elbow.localRotation = Quaternion.Slerp(elbow.localRotation, Quaternion.Euler(bend, 0, 0), drag);
             }
@@ -406,8 +418,9 @@ namespace TheElevator
         {
             float thigh = swing * walk * Mathf.Lerp(26, 48, run);
             float fold = walk * (Mathf.Max(0, -travel) * Mathf.Lerp(35, 95, run) + Mathf.Lerp(4, 12, run)) + rest * 6;
-            hip.localRotation = Quaternion.Euler(Mathf.Lerp(thigh - fold * .25f, -86, seat), 0, 0);
-            knee.localRotation = Quaternion.Euler(Mathf.Lerp(fold, 86, seat), 0, 0);
+            float sit = Mathf.SmoothStep(0, 1, seat);
+            hip.localRotation = Quaternion.Euler(Mathf.Lerp(thigh - fold * .25f, -86, sit), 0, 0);
+            knee.localRotation = Quaternion.Euler(Mathf.Lerp(fold, 86, sit), 0, 0);
             float toe = Mathf.Max(0, swing) * walk * Mathf.Lerp(10, 25, run) * (1 - seat);
             ankle.rotation = Quaternion.Euler(0, transform.eulerAngles.y, 0) * Quaternion.Euler(toe, 0, 0);
         }

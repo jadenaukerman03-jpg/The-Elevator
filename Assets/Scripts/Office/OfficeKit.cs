@@ -39,9 +39,7 @@ namespace TheElevator.Office
                     A.Box(wall,"Inset acoustic wall panel",new Vector3(sign*4.3f,2.05f,5.79f),new Vector3(2.65f,1.52f,.04f),service?A.Metal:A.Upholstery);
                     for(int rib=0;rib<4;rib++) A.Box(wall,"Acoustic rib",new Vector3(sign*4.3f-1.17f+rib*.72f,2.05f,5.745f),new Vector3(.12f,1.20f,.085f),publicArea?A.Brass:A.Dark);
                 }
-                A.Box(wall,"Wayfinding plaque",new Vector3(0,3.06f,5.7f),new Vector3(2.65f,.36f,.075f),A.Dark);
-                A.Label(wall,(room.Id==0?"WELCOME / ":OfficePlan.Departments[info.Department]+" / ")+KindName(info.Kind),new Vector3(0,3.07f,5.65f),.025f);
-                if(edges[side]==Edge.Door&&!(room.Has(RoomRole.Entrance)&&side==2))
+               if(edges[side]==Edge.Door&&!(room.Has(RoomRole.Entrance)&&side==2))
                 {
                     // A plain cased opening; the one real door hangs in the passage beyond it.
                     for(int sign=-1;sign<=1;sign+=2)A.Box(wall,"Finished door jamb",new Vector3(sign*1.45f,1.4f,5.73f),new Vector3(.20f,2.8f,.26f),A.Dark);
@@ -72,14 +70,7 @@ namespace TheElevator.Office
                 // Suspended sculpture keeps the walking lanes unobstructed below 2.8 m.
                 A.Round(landmark,"Corporate memory disc",Vector3.zero,new Vector3(1.35f,.045f,1.35f),departmentAccent);
                 for(int i=0;i<4;i++){Transform vane=A.Group(landmark,"Sculpture vane",Vector3.zero,i*90+room.Id%30);A.Box(vane,"Brass memory fin",new Vector3(.55f,.1f,0),new Vector3(.07f,.4f,.8f),A.Brass);}
-                for(int side=0;side<4;side++)if(edges[side]==Edge.Wall&&side!=annexSide)
-                {
-                    Transform wall=A.Group(geometry,"Memory plaque wall",Vector3.zero,side*90);
-                    A.Box(wall,"Memory plaque",new Vector3(0,3.46f,5.76f),new Vector3(2.7f,.34f,.05f),A.Dark);
-                    A.Label(wall,"CORPORATE MEMORY / "+room.Id.ToString("000"),new Vector3(0,3.46f,5.73f),.041f);
-                    break;
-                }
-            }
+           }
             if(annexSide>=0)MeetingRoom(geometry,room.Id,annexSide,height);
             else Furnish(geometry,room,info,height);
         }
@@ -106,9 +97,9 @@ namespace TheElevator.Office
             }
             if(cubicle)
             {
-                A.Box(t,"Cubicle acoustic divider",new Vector3(0,1.12f,.72f),new Vector3(2.3f,1.26f,.18f),A.Upholstery,true);
+                A.Box(t,"Cubicle acoustic divider",new Vector3(0,.88f,.72f),new Vector3(2.3f,1.76f,.18f),A.Upholstery,true);
                 A.Box(t,"Divider cap",new Vector3(0,1.77f,.72f),new Vector3(2.34f,.035f,.10f),A.Metal);
-                A.Box(t,"Divider side",new Vector3(-1.12f,1.12f,.18f),new Vector3(.18f,1.26f,1.05f),A.Upholstery,true);
+                A.Box(t,"Divider side",new Vector3(-1.12f,.88f,.18f),new Vector3(.18f,1.76f,1.05f),A.Upholstery,true);
             }
             Monitor(t,new Vector3(.05f,.81f,.34f),(room==2||room%3==0)&&recoverableRooms.Add(room));
             A.Box(t,"Keyboard",new Vector3(.03f,.815f,-.19f),new Vector3(.45f,.023f,.17f),A.Plastic);
@@ -120,14 +111,14 @@ namespace TheElevator.Office
             Paperwork(t,new Vector3(-.66f,.81f,-.12f));
             Mug(t,new Vector3(.81f,.81f,.25f));
             A.Box(t,"Personal name plate",new Vector3(-.68f,.88f,.47f),new Vector3(.55f,.12f,.1f),A.Brass);
-            A.Label(t,"UNIT "+(room*7+42)+" / ASSOCIATE",new Vector3(-.68f,.89f,.408f),.012f);
-            A.Box(t,"PC tower",new Vector3(.78f,.38f,.33f),new Vector3(.3f,.62f,.47f),A.Dark);
-            for(int slot=0;slot<10;slot++)A.Box(t,"Tower intake grille",new Vector3(.78f,.19f+slot*.025f,.090f),new Vector3(.21f,.009f,.006f),A.Metal);
-            for(int usb=0;usb<2;usb++)A.Box(t,"Front USB socket",new Vector3(.735f+usb*.085f,.59f,.086f),new Vector3(.04f,.018f,.008f),A.Metal);
-            A.Round(t,"Power button",new Vector3(.78f,.65f,.085f),new Vector3(.02f,.02f,.008f),A.Metal,PrimitiveType.Sphere);
-            A.Box(t,"PC status strip",new Vector3(.78f,.5f,.085f),new Vector3(.15f,.014f,.015f),A.Screen);
+            // The tower stands on the floor under the desk.
+            A.Box(t,"PC tower",new Vector3(.78f,.31f,.33f),new Vector3(.3f,.62f,.47f),A.Dark);
+            for(int slot=0;slot<10;slot++)A.Box(t,"Tower intake grille",new Vector3(.78f,.12f+slot*.025f,.090f),new Vector3(.21f,.009f,.006f),A.Metal);
+            for(int usb=0;usb<2;usb++)A.Box(t,"Front USB socket",new Vector3(.735f+usb*.085f,.52f,.086f),new Vector3(.04f,.018f,.008f),A.Metal);
+            A.Round(t,"Power button",new Vector3(.78f,.58f,.085f),new Vector3(.02f,.02f,.008f),A.Metal,PrimitiveType.Sphere);
+            A.Box(t,"PC status strip",new Vector3(.78f,.43f,.085f),new Vector3(.15f,.014f,.015f),A.Screen);
             A.Round(t,"Waste bin",new Vector3(-.84f,.21f,-.42f),new Vector3(.3f,.21f,.3f),A.Metal);
-            A.Box(t,"Cable channel",new Vector3(0,.66f,.46f),new Vector3(1.6f,.045f,.045f),A.Dark);
+            A.Box(t,"Cable channel",new Vector3(0,.678f,.46f),new Vector3(1.6f,.045f,.045f),A.Dark);
             DeskDetails(t,room);
             Task(t,room,OfficeTask.Typing,new Vector3(0,0,-.83f),true);
         }
@@ -156,16 +147,18 @@ namespace TheElevator.Office
         }        public void Chair(Transform t,Vector3 p)
         {
             Transform c=A.Group(t,"Ergonomic chair",p);
-            A.Round(c,"Chair gas lift",new Vector3(0,.25f,0),new Vector3(.07f,.2f,.07f),A.Metal);
+            // Castors on the floor, spokes on the castors, gas lift on the spokes, seat on the lift.
+            A.Round(c,"Chair gas lift",new Vector3(0,.2f,0),new Vector3(.07f,.12f,.07f),A.Metal);
             for(int i=0;i<5;i++)
             {
                 Transform leg=A.Group(c,"Chair spoke",Vector3.zero,i*72);
-                A.Box(leg,"Castor arm",new Vector3(0,.1f,.2f),new Vector3(.04f,.045f,.42f),A.Metal);
-                A.Round(leg,"Castor",new Vector3(0,.05f,.38f),new Vector3(.085f,.055f,.085f),A.Dark,PrimitiveType.Sphere);
+                A.Box(leg,"Castor arm",new Vector3(0,.08f,.2f),new Vector3(.04f,.045f,.42f),A.Metal);
+                A.Round(leg,"Castor",new Vector3(0,.03f,.38f),new Vector3(.085f,.06f,.085f),A.Dark,PrimitiveType.Sphere);
             }
-            A.Box(c,"Sculpted seat",new Vector3(0,.46f,0),new Vector3(.60f,.17f,.56f),A.Upholstery);
-            A.Box(c,"Lumbar back",new Vector3(0,.79f,-.24f),new Vector3(.59f,.58f,.17f),A.Upholstery);
-            for(int s=-1;s<=1;s+=2) A.Box(c,"Chair armrest",new Vector3(s*.31f,.68f,.015f),new Vector3(.065f,.05f,.4f),A.Dark);
+            A.Box(c,"Sculpted seat",new Vector3(0,BeanRig.SeatSurface-.085f,0),new Vector3(.60f,.17f,.56f),A.Upholstery);
+            A.Box(c,"Lumbar back",new Vector3(0,.705f,-.24f),new Vector3(.59f,.58f,.17f),A.Upholstery);
+            for(int s=-1;s<=1;s+=2) A.Box(c,"Chair armrest",new Vector3(s*.31f,.595f,.015f),new Vector3(.065f,.05f,.4f),A.Dark);
+            c.gameObject.AddComponent<OfficeSeat>();
         }
         public void Paperwork(Transform t,Vector3 p)
         {
@@ -193,7 +186,6 @@ namespace TheElevator.Office
                 GameObject leaf=A.Round(plant,"Molded foliage",new Vector3(Mathf.Sin(angle)*.23f,1.05f+i*.067f,Mathf.Cos(angle)*.23f),new Vector3(.18f,.045f,.46f),A.Upholstery,PrimitiveType.Sphere);
                 leaf.transform.localRotation=Quaternion.Euler(15,i*137.5f,-20);
             }
-            A.Label(plant,"LIVING ASSET\nDO NOT WATER",new Vector3(0,.35f,-.25f),.016f);
         }
         void Reception(Transform t,int room)
         {
@@ -202,21 +194,24 @@ namespace TheElevator.Office
             for(int i=0;i<14;i++) A.Box(t,"Reception vertical fluting",new Vector3(-1.05f+i*.16f,.61f,-.13f),new Vector3(.035f,.94f,.025f),A.Brass);
             Transform terminal=A.Group(t,"Reception terminal facing employee",new Vector3(-.58f,1.21f,.36f),180);Monitor(terminal,Vector3.zero);
             A.Box(t,"Reception keyboard",new Vector3(0,1.22f,.63f),new Vector3(.6f,.035f,.18f),A.Plastic);
-            A.Label(t,"M / VISITOR SERVICES",new Vector3(.2f,.7f,-.16f),.04f);
+            A.Label(t,"RECEPTION",new Vector3(.2f,.7f,-.16f),.04f);
             Task(t,room,OfficeTask.Reception,new Vector3(0,0,1.05f),false,180);
         }
         void Lounge(Transform t)
         {
-            A.Box(t,"Upholstered settee",new Vector3(0,.4f,.2f),new Vector3(2.05f,.4f,.78f),A.Upholstery,true);
-            A.Box(t,"Settee back",new Vector3(0,.73f,.54f),new Vector3(2.08f,.55f,.17f),A.Upholstery);
-            for(int s=-1;s<=1;s+=2) A.Box(t,"Settee arm",new Vector3(s*.97f,.65f,.18f),new Vector3(.14f,.36f,.79f),A.Wood);
+            // The settee base, back and arms all stand on the floor; the cushions sit on the base.
+            A.Box(t,"Upholstered settee",new Vector3(0,.18f,.2f),new Vector3(2.05f,.36f,.78f),A.Upholstery,true);
+            A.Box(t,"Settee back",new Vector3(0,.48f,.54f),new Vector3(2.08f,.96f,.17f),A.Upholstery);
+            for(int s=-1;s<=1;s+=2) A.Box(t,"Settee arm",new Vector3(s*.97f,.31f,.18f),new Vector3(.14f,.62f,.79f),A.Wood);
             A.Box(t,"Coffee table",new Vector3(0,.35f,-.86f),new Vector3(1.15f,.065f,.53f),A.Wood,true);
             A.Box(t,"Coffee table pedestal",new Vector3(0,.16f,-.86f),new Vector3(.16f,.32f,.2f),A.Brass);
-            Paperwork(t,new Vector3(.2f,.39f,-.85f));
+            Paperwork(t,new Vector3(.2f,.383f,-.85f));
             for(int i=-1;i<=1;i++)
             {
-                A.Box(t,"Individual settee cushion",new Vector3(i*.62f,.61f,.18f),new Vector3(.59f,.075f,.65f),A.Upholstery);
-                A.Box(t,"Settee stitched back seam",new Vector3(i*.62f,.77f,.447f),new Vector3(.006f,.36f,.006f),A.Dark);
+                A.Box(t,"Individual settee cushion",new Vector3(i*.62f,(.36f+BeanRig.SeatSurface)*.5f,.18f),new Vector3(.59f,BeanRig.SeatSurface-.36f,.65f),A.Upholstery);
+                A.Box(t,"Settee stitched back seam",new Vector3(i*.62f,.72f,.451f),new Vector3(.006f,.36f,.006f),A.Dark);
+                // One place to sit per cushion, facing away from the back.
+                A.Group(t,"Settee place",new Vector3(i*.62f,0,.15f),180).gameObject.AddComponent<OfficeSeat>();
             }
             A.Box(t,"Company magazine",new Vector3(-.31f,.39f,-.87f),new Vector3(.29f,.02f,.37f),A.Red);
             A.Box(t,"Magazine title band",new Vector3(-.31f,.403f,-.93f),new Vector3(.24f,.004f,.05f),A.Paper);
@@ -233,7 +228,6 @@ namespace TheElevator.Office
             Mug(t,new Vector3(.5f,.99f,.2f));
             A.Box(t,"Microwave",new Vector3(.5f,1.2f,.38f),new Vector3(.75f,.4f,.44f),A.Plastic);
             A.Box(t,"Microwave window",new Vector3(.45f,1.2f,.148f),new Vector3(.48f,.26f,.014f),A.Dark);
-            A.Label(t,"DO NOT MICROWAVE YOUR HANDS",new Vector3(0,1.95f,.66f),.028f);
             KitchenDetails(t);
             Task(t,room,OfficeTask.Coffee,new Vector3(-.55f,0,-.4f),false);
         }
@@ -270,6 +264,7 @@ namespace TheElevator.Office
             // Mirrors, dispensers and the sign mount on a full-height splashback, never in mid air.
             A.Box(t,"Washroom splashback",new Vector3(0,1.3f,.8f),new Vector3(2.15f,2.6f,.06f),A.Tile);
             A.Box(t,"Vanity counter",new Vector3(0,.82f,.3f),new Vector3(1.95f,.12f,.72f),A.Tile,true);
+            A.Box(t,"Vanity cabinet",new Vector3(0,.38f,.36f),new Vector3(1.85f,.76f,.62f),A.Wood,true);
             for(int side=-1;side<=1;side+=2)
             {
                 A.Round(t,"Inset basin",new Vector3(side*.5f,.89f,.24f),new Vector3(.55f,.045f,.43f),A.Plastic);
@@ -280,7 +275,7 @@ namespace TheElevator.Office
             A.Box(t,"Soap level window",new Vector3(0,1.29f,.625f),new Vector3(.06f,.17f,.015f),A.Screen);
             A.Box(t,"Towel dispenser",new Vector3(.94f,1.46f,.68f),new Vector3(.26f,.35f,.18f),A.Metal);
             A.Box(t,"Paper towel",new Vector3(.94f,1.2f,.66f),new Vector3(.20f,.19f,.015f),A.Paper);
-            A.Label(t,"HANDWASH CYCLE / 40 SECONDS",new Vector3(0,2.3f,.765f),.027f);
+            A.Label(t,"PLEASE WASH YOUR HANDS",new Vector3(0,2.3f,.765f),.027f);
         }
         public void Vending(Transform t)
         {
@@ -297,7 +292,6 @@ namespace TheElevator.Office
             for(int i=0;i<6;i++) A.Box(t,"Selection button",new Vector3(.38f+i%2*.09f,1.25f-i/2*.1f,-.5f),new Vector3(.055f,.048f,.03f),A.Plastic);
             A.Box(t,"Delivery chute",new Vector3(0,.37f,-.49f),new Vector3(.83f,.25f,.07f),A.Metal);
             A.Label(t,"NOURISH / 9",new Vector3(0,1.88f,-.485f),.056f);
-            A.Label(t,"HUMAN FLAVOUR. ZERO HUMANS.",new Vector3(0,.57f,-.5f),.018f);
             VendingDetails(t);
         }
         void Task(Transform t,int room,OfficeTask activity,Vector3 p,bool seated,float yaw=0)

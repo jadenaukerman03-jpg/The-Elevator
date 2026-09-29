@@ -31,9 +31,17 @@ Office staff dress for their job: associate, receptionist (headset), technician 
 
 ### Anger and the boardroom
 
-There are no suspicion or incident meters. Every employee has their own anger, starting calm (1) and rising to furious (5) as you upset them; read it on their face: a resting face, then annoyed, irritated, angry, and finally red-faced and shouting. Anger cools slowly while they can't see you.
+There are no suspicion or incident meters. Every employee has their own anger, starting calm (1) and rising to furious (5); read it on their face: a resting face, then annoyed, irritated, angry, and finally red-faced and shouting. Walking, running or sitting near people does not upset them. Walking into someone does: each bump raises that one employee's anger by one level. Being seen carrying stolen property still makes them suspicious. Anger slowly cools again.
 
-Most floors hide a boardroom: a dead-end room two rooms long with one door, a long table ringed by mostly occupied chairs, and a presenter at the far end pointing a stick at the quarterly chart. Walk in and every head turns, and everyone's anger rises the longer you stay.
+Most floors hide a boardroom: a dead-end room two rooms long with one door, a long table ringed by mostly occupied chairs, and a presenter at the far end pointing a stick at the quarterly chart. You may walk in and listen; nobody minds unless you bump into them.
+
+### Sitting
+
+Every desk chair, boardroom chair, armchair and sofa cushion is a seat. Look at a free one and press E to sit; E, Space or any movement key stands you back up. Employees use the same sit-down animation: they squat into the seat leaning forward, then settle back with their hands on their lap. A seat you are sitting on is held for you; its usual occupant waits.
+
+### Fire extinguishers
+
+One room in four has a fire extinguisher hanging on a wall bracket. It is worth $10. Pick it up and the left hand carries the canister while the right hand aims the nozzle on its hose. Hold the left mouse button to spray white foam. Anyone in the stream is pushed back like a strong wind for as long as you keep spraying. The foam is only visual and melts away about 20 seconds after it lands. A full extinguisher sprays for 12 seconds in total; stopping early keeps the rest, and an empty one stops spraying. The ring around the cursor fills as you use it up.
 
 ![Anger levels 1 to 5](Docs/ArtDirection/anger.png)
 
@@ -65,8 +73,9 @@ Cargo recovered in the cabin persists between floors. Pause and loss of focus st
 | WASD / mouse | Move / look |
 | Shift / Space | Sprint / jump |
 | Ctrl or C | Crouch |
-| E | Pick up, drop, or use survey terminal |
-| Hold/release Q | Charge/release throw; tap gently drops; E cancels |
+| E | Pick up, drop, sit/stand, or use survey terminal |
+| Hold/release Q | Charge/release throw: a ring fills around the cursor, and a full ring is the hardest throw; tap gently drops; E cancels |
+| Hold left mouse | Use the held item (spray an extinguisher); the same ring shows how much is used |
 | F | Connect held power cell inside lift |
 | E / left click on a floor number | Select an unlocked elevator floor |
 | L | Flashlight |

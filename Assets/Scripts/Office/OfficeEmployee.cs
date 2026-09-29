@@ -78,12 +78,31 @@ namespace TheElevator.Office
             Suspicion=Mathf.Clamp(Suspicion+amount,0,100);attentionUntil=Time.time+7;
             if(Office.Game){LastObservedPosition=Office.Game.Player.transform.position;Robot.LookTarget=LastObservedPosition+Vector3.up*(Office.Game.Player.Crouched?WorkerController.CrouchEyeHeight:WorkerController.EyeHeight);Office.Questioner=this;Office.Game.Notify(Job+": "+reason);}
         }
-        // Staring at the intruder while they stay in the room; anger keeps climbing.
-        public void Glare(float anger)
+        // Suspicion that puts the face in the middle of each anger level (index = level).
+        static readonly float[] AngerMidpoint={0,0,20,40,62,88};
+        // Walking into someone is what annoys them: each bump raises this employee's anger by exactly one level.
+        public void Bump()
         {
-            if(!Office.Game)return;
-            attentionUntil=Mathf.Max(attentionUntil,Time.time+1.5f);
-            Suspicion=Mathf.Clamp(Suspicion+anger,0,100);
+            Suspicion=Mathf.Max(Suspicion,AngerMidpoint[Mathf.Min(5,AngerLevel+1)]);attentionUntil=Time.time+4;
+            if(Office.Game){LastObservedPosition=Office.Game.Player.transform.position;Office.Game.Notify(Job+": Hey! Watch where you're going.");}
+        }
+        Vector3 push;
+        float windUntil;
+        public bool Pushed { get { return push.sqrMagnitude>.01f; } }
+        // A steady shove, like a strong wind: while it keeps blowing the employee slides along with it.
+        public void Push(Vector3 wind)
+        {
+            wind.y=0;windUntil=Time.time+.12f;
+            push=Vector3.MoveTowards(push,wind,Time.deltaTime*30);
+        }
+        void Shoved()
+        {
+            Robot.Seated=false;motor.enabled=true;State="Pushed back";
+            motor.Move((push+Vector3.down*5)*Time.deltaTime);
+            if(Time.time>windUntil)push=Vector3.MoveTowards(push,Vector3.zero,Time.deltaTime*7);
+            if(Pushed)return;
+            // Once the wind stops, walk back to wherever they were going.
+            if(!Travelling&&Station&&!AtStation&&!TryTravel(Station)){route.Clear();route.Add(Station.transform.position);}
         }
         void Update()
         {
@@ -99,15 +118,17 @@ namespace TheElevator.Office
                     if(sees)
                     {
                         LastObservedPosition=Office.Game.Player.transform.position;
-                        float suspicious=Office.Game.Player.MovingFast?4:0;
+                        // Walking, running or sitting nearby is not suspicious; only visible theft is.
+                        float suspicious=0;
                         if(Office.Transported)suspicious+=10;
                         if(Office.Game.Player.Held&&!Office.Game.Player.Held.IsBattery)suspicious+=4;
                         if(Office.Map.NearestRoom(LastObservedPosition).Id==Office.Plan.TargetRoom&&!Office.HasAccess(2,Office.Plan.Rooms[Office.Plan.TargetRoom].Department))suspicious+=12;
-                        if(Office.Blending)suspicious-=8;
-                        Suspicion=Mathf.Clamp(Suspicion+(suspicious-1)*interval,0,100);
+                        if(Office.Blending)suspicious=0;
+                        // Anger cools slowly when nothing suspicious is happening.
+                        Suspicion=Mathf.Clamp(Suspicion+(suspicious>0?suspicious:-.35f)*interval,0,100);
                         if(Suspicion>20)attentionUntil=Time.time+2;
                     }
-                    else Suspicion=Mathf.Max(0,Suspicion-interval*1.2f);
+                    else Suspicion=Mathf.Max(0,Suspicion-interval*.35f);
                     if(Suspicion>40&&sees)Office.Questioner=this;
                     if(Suspicion>Threshold&&reportAt<0)reportAt=Time.time+5;
                     if(reportAt>0&&Time.time>reportAt){Office.ReportToSecurity(Department,25,LastObservedPosition);reportAt=-1;Suspicion=Mathf.Max(25,Suspicion-12);}
@@ -123,7 +144,8 @@ namespace TheElevator.Office
                 if(!Travelling&&CoffeeStage<0&&Time.time>nextTask&&Suspicion<40&&!Supervisor&&HomeRoom!=Office.Plan.MeetingRoom&&HomeStation.Activity!=OfficeTask.Reception)ChooseTask();
             }
             // A started trip always completes, even when the player leaves: no frozen doorway occupants.
-            if(Travelling)Walk();
+            if(Pushed)Shoved();
+            else if(Travelling)Walk();
             else if(Station&&AtStation)
             {
                 motor.enabled=false;Robot.Seated=Station.Seated;Robot.Activity=Station.Activity;

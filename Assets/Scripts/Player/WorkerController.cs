@@ -28,6 +28,17 @@ namespace TheElevator
         public FirstPersonHands Hands { get; private set; }
         public float ThrowCharge { get; private set; }
         public bool ChargingThrow { get; private set; }
+        // Intended walking velocity this frame (what the player is steering, before collisions).
+        public Vector3 Motion { get; private set; }
+        public TheElevator.Office.OfficeSeat Seat { get; private set; }
+        // Seated view: a little lower than standing, so sitting reads as sitting.
+        public const float SeatedEyeHeight=1.22f;
+        TheElevator.Office.OfficeSeat seatTarget;
+        TheElevator.Office.OfficeTaskPoint seatStation;
+        Vector3 standPosition;
+        Quaternion standRotation;
+        float sitBlend;
+        bool standingUp;
         // Camera sits at the avatar's own eye line, the same height as every NPC's eyes.
         public const float EyeHeight=1.34f, CrouchEyeHeight=.9f;
         float eyeHeight=EyeHeight;
@@ -70,6 +81,7 @@ namespace TheElevator
 
         public void Teleport(Vector3 position)
         {
+            if (Seat) LeaveSeat();
             motor.enabled = false;
             transform.position = position;
             motor.enabled = true;
@@ -90,6 +102,7 @@ namespace TheElevator
             damageCooldown -= Time.deltaTime;
             yaw += Input.GetAxisRaw("Mouse X") * 2.1f;
             pitch = Mathf.Clamp(pitch - Input.GetAxisRaw("Mouse Y") * 1.8f, -65, 75);
+            if (Seat) { UpdateSeated(); return; }
             if (Input.GetKeyDown(KeyCode.L)) flashlightOn = !flashlightOn;
             if (Input.GetKeyDown(KeyCode.V) && (Application.isEditor || Debug.isDebugBuild))
             {
@@ -100,6 +113,7 @@ namespace TheElevator
             float forward = (Input.GetKey(KeyCode.W) ? 1 : 0) - (Input.GetKey(KeyCode.S) ? 1 : 0);
             Vector3 input = Vector3.ClampMagnitude(new Vector3(horizontal, 0, forward), 1);
             Vector3 direction = Quaternion.Euler(0, yaw, 0) * input;
+            FireExtinguisher extinguisher = Held ? Held.GetComponent<FireExtinguisher>() : null;
             SetCrouched(Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C));
             MovingFast = !Crouched && Input.GetKey(KeyCode.LeftShift) && Stamina > 0.08f && input.sqrMagnitude > 0.1f;
             Stamina = infiniteStamina ? 1f : Mathf.Clamp01(Stamina + Time.deltaTime * (MovingFast ? -0.23f : 0.17f));
@@ -121,6 +135,7 @@ namespace TheElevator
                 }
             }
             vertical -= 18f * Time.deltaTime;
+            Motion = direction * speed;
             motor.Move((direction * speed + Vector3.up * vertical + knockback) * Time.deltaTime);
             knockback = Vector3.Lerp(knockback, Vector3.zero, Time.deltaTime * 5);
             Model.Animate(direction.magnitude * speed, Held, Time.deltaTime);
@@ -131,7 +146,8 @@ namespace TheElevator
                 if (MovingFast) game.NoiseAt(transform.position, 0.8f);
             }
             UpdateTarget();
-            if (Input.GetKeyDown(KeyCode.E) || (CanInteract && Input.GetMouseButtonDown(0)))
+            // With a usable item in hand the mouse button uses it; E still interacts.
+            if (Input.GetKeyDown(KeyCode.E) || (CanInteract && !extinguisher && Input.GetMouseButtonDown(0)))
             {
                 if(elevatorButton){elevatorButton.Press();}
                 else if(notebook){notebook.Open();}
@@ -139,18 +155,21 @@ namespace TheElevator
                 else if (Held) Drop(false);
                 else if (terminal) terminal.Use(game);
                 else if (Target) PickUp(Target);
+                else if (seatTarget) Sit(seatTarget);
             }
             if(Input.GetKeyDown(KeyCode.Q)&&Held)BeginThrowCharge();
             if(ChargingThrow&&Held&&Input.GetKey(KeyCode.Q))AdvanceThrowCharge(Time.deltaTime);
             if(ChargingThrow&&Input.GetKeyUp(KeyCode.Q))ReleaseChargedThrow();
             if (Input.GetKeyDown(KeyCode.F) && Held && Held.IsBattery && InCabin) game.UseBattery();
+            extinguisher = Held ? Held.GetComponent<FireExtinguisher>() : null;
+            if (extinguisher) extinguisher.Operate(this, !ChargingThrow && Input.GetMouseButton(0), Time.deltaTime);
 
             if (transform.position.y < -8) game.Finish(false, "The facility has no basement for this basement.");
         }
 
         void UpdateTarget()
         {
-            Target = null;CanInteract=false;elevatorButton=null;notebook=null;
+            Target = null;CanInteract=false;elevatorButton=null;notebook=null;seatTarget=null;
             terminal = null;
             Prompt = "";
             if (Held)
@@ -158,7 +177,8 @@ namespace TheElevator
                 Prompt = Held.Title;
             }
             Ray ray = View.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
-            if (Physics.Raycast(ray, out RaycastHit hit, 2.8f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            bool looking = Physics.Raycast(ray, out RaycastHit hit, 2.8f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            if (looking)
             {
                 ElevatorButton floorButton=hit.collider.GetComponentInParent<ElevatorButton>();
                 if(floorButton){if(floorButton.Available){elevatorButton=floorButton;CanInteract=true;}return;}
@@ -182,6 +202,12 @@ namespace TheElevator
                     Target = Held?null:item;
                     CanInteract=!Held&&!item.IsHeld;Prompt = item.Title;
                 }
+            }
+            // Nothing else under the crosshair: a free seat you are looking at can be sat on.
+            if (!Held && !Target && game.CurrentOffice)
+            {
+                seatTarget = TheElevator.Office.OfficeSeat.Aimed(View.transform.position, looking ? hit.point : ray.GetPoint(2.2f), game.CurrentOffice);
+                if (seatTarget) { CanInteract = true; Prompt = "Sit down"; }
             }
 
         }
@@ -238,13 +264,62 @@ namespace TheElevator
 
         public void Recover() { Stamina = 1; }
 
+        // Anything that shoves the player steadily (extinguisher foam) pushes them along like a strong wind.
+        public void Push(Vector3 wind)
+        {
+            if (Seat) return;
+            wind.y = 0;
+            knockback = Vector3.MoveTowards(knockback, wind, Time.deltaTime * 30);
+        }
+
+        public bool Sit(TheElevator.Office.OfficeSeat seat)
+        {
+            if (!seat || Held || Seat || !seat.Free(game.CurrentOffice)) return false;
+            SetCrouched(false);
+            ChargingThrow = false; ThrowCharge = 0; Motion = Vector3.zero; knockback = Vector3.zero;
+            Seat = seat; seat.Sitter = this; sitBlend = 0; standingUp = false;
+            standPosition = transform.position; standRotation = transform.rotation;
+            // The employee who works here waits until the seat is free again.
+            seatStation = seat.Station(game.CurrentOffice);
+            if (seatStation) seatStation.ReservedByPlayer = true;
+            motor.enabled = false;
+            game.Sound.Play(140, .08f, .05f);
+            return true;
+        }
+
+        public void StandUp() { if (Seat) standingUp = true; }
+
+        // Seated: turn around to look (within reason); E, Space or any movement key stands back up.
+        void UpdateSeated()
+        {
+            Prompt = "E  STAND UP"; CanInteract = false; Target = null; seatTarget = null; Motion = Vector3.zero;
+            bool leave = Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.D);
+            if (leave && sitBlend > .5f) standingUp = true;
+            sitBlend = Mathf.MoveTowards(sitBlend, standingUp ? 0 : 1, Time.deltaTime / .55f);
+            float t = Mathf.SmoothStep(0, 1, sitBlend);
+            transform.SetPositionAndRotation(Vector3.Lerp(standPosition, Seat.transform.position, t), Quaternion.Slerp(standRotation, Seat.transform.rotation, t));
+            float facing = Seat.transform.eulerAngles.y;
+            yaw = facing + Mathf.Clamp(Mathf.DeltaAngle(facing, yaw), -120, 120);
+            Model.Animate(0, false, Time.deltaTime, !standingUp);
+            if (standingUp && sitBlend <= 0) LeaveSeat();
+        }
+
+        void LeaveSeat()
+        {
+            if (seatStation) seatStation.ReservedByPlayer = false;
+            if (Seat) { Seat.Sitter = null; transform.position = standPosition; }
+            Seat = null; seatStation = null; standingUp = false; sitBlend = 0;
+            transform.rotation = Quaternion.Euler(0, yaw, 0);
+            motor.enabled = true;
+        }
+
         void OnGUI()
         {
-            if(!ChargingThrow||!Held)return;
-            float width=260,x=Screen.width*.5f-width*.5f,y=Screen.height-95;
-            GUI.Box(new Rect(x-10,y-26,width+20,65),"THROW STRENGTH / "+Mathf.RoundToInt(ThrowCharge*100)+"%  — E CANCEL");
-            Color old=GUI.color;GUI.color=new Color(.18f,.20f,.19f);GUI.DrawTexture(new Rect(x,y+5,width,15),Texture2D.whiteTexture);
-            GUI.color=Color.Lerp(Color.yellow,new Color(1,.25f,.1f),ThrowCharge);GUI.DrawTexture(new Rect(x,y+5,width*ThrowCharge,15),Texture2D.whiteTexture);GUI.color=old;
+            if(!game||!game.ControlsActive||!Held||ReadingNotebook||PreviewAvatar)return;
+            // Throw strength and item usage share one ring around the cursor.
+            if(ChargingThrow){CursorGauge.Draw(ThrowCharge,Color.Lerp(new Color(1,.85f,.3f),new Color(1,.3f,.12f),ThrowCharge));return;}
+            FireExtinguisher extinguisher=Held.GetComponent<FireExtinguisher>();
+            if(extinguisher&&extinguisher.Used>0)CursorGauge.Draw(extinguisher.Used,extinguisher.Empty?new Color(.95f,.32f,.25f):new Color(.93f,.97f,1f,extinguisher.Spraying?1:.7f));
         }
         void OnDestroy(){if(Hands)Destroy(Hands.gameObject);}
         void LateUpdate()
@@ -277,7 +352,13 @@ namespace TheElevator
             View.rect = new Rect(0, 0, 1, 1);
             if (game.Paused) return;
             Quaternion rotation = Quaternion.Euler(pitch, yaw, 0);
-            eyeHeight=Mathf.MoveTowards(eyeHeight,Crouched?CrouchEyeHeight:EyeHeight,Time.deltaTime*4);
+            if(Seat)
+            {
+                // Dip forward-and-down through the middle of the sit, then settle at the seated eye line.
+                float t=Mathf.SmoothStep(0,1,sitBlend);
+                eyeHeight=Mathf.Lerp(EyeHeight,SeatedEyeHeight,t)-Mathf.Sin(sitBlend*Mathf.PI)*.08f;
+            }
+            else eyeHeight=Mathf.MoveTowards(eyeHeight,Crouched?CrouchEyeHeight:EyeHeight,Time.deltaTime*4);
             Vector3 pivot = transform.position + Vector3.up * (firstPerson ? eyeHeight : Crouched?.75f:1.2f);
             Vector3 position = pivot;
             if (!firstPerson)
@@ -289,6 +370,8 @@ namespace TheElevator
                 position += back * distance;
             }
             View.transform.SetPositionAndRotation(position, rotation);
+            FireExtinguisher held = Held ? Held.GetComponent<FireExtinguisher>() : null;
+            if (held && Held.IsHeld) held.PoseHeld(View.transform);
             if(Hands)Hands.Present(Held,firstPerson&&game.ControlsActive&&!ReadingNotebook,Time.deltaTime);
         }
     }

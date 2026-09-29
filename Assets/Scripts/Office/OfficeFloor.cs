@@ -47,7 +47,7 @@ namespace TheElevator.Office
             BuildDoors();
             if(Game)
             {
-                BuildCargo(); MakeComputersStealable();
+                BuildCargo(); MakeComputersStealable(); BuildExtinguishers();
                 SetupSound();
                 officeLights=GetComponentsInChildren<Light>(true);
                 // Appearance switches only for the office theme; Civic Works keeps its worker model.
@@ -123,6 +123,12 @@ namespace TheElevator.Office
                 OfficeCargo cargo=asset.gameObject.AddComponent<OfficeCargo>();cargo.Initialize(this,value,false);loot++;
             }
         }
+        // Wall-mounted extinguishers: cheap pickups the player can carry, throw or spray.
+        void BuildExtinguishers()
+        {
+            foreach(Transform mount in Kit.ExtinguisherMounts)
+                if(mount)FireExtinguisher.Create(Game,Kit.A,transform,mount.position+Vector3.up*FireExtinguisher.HalfHeight,mount.rotation);
+        }
         public bool HasAccess(int clearance,int department)
         { return BadgeLevel>=clearance&&(clearance<2||BadgeDepartment==department||BadgeLevel>=3)&&!(Alarm&&Plan.Config.InvalidateBadgesOnAlarm); }
         public void GiveBadge(int level,int department){BadgeLevel=Math.Max(BadgeLevel,level);BadgeDepartment=department;}
@@ -136,7 +142,7 @@ namespace TheElevator.Office
         public void ReportAction(Vector3 point,float amount,OfficeEmployee excluded)
         { foreach(OfficeEmployee employee in Employees)if(employee!=excluded&&employee.Sees(point))employee.React(amount,"What are you doing with company property?"); }
         public void HearNoise(Vector3 point,float strength)
-        { foreach(OfficeEmployee employee in Employees)if(Vector3.Distance(employee.transform.position,point)<strength*12) { employee.Robot.LookTarget=point;employee.Suspicion=Mathf.Min(100,employee.Suspicion+strength*4); } }
+        { foreach(OfficeEmployee employee in Employees)if(Vector3.Distance(employee.transform.position,point)<strength*12)employee.Robot.LookTarget=point; }
         public bool InteractPressed()
         {
             if(!Game||!Game.ControlsActive)return false;
@@ -185,6 +191,7 @@ namespace TheElevator.Office
                 { Questioner.Suspicion=Mathf.Max(0,Questioner.Suspicion-(BadgeLevel>=2?25:10));nextBluff=Time.time+20;Game.Notify("Identity check deferred. Try looking busy."); }
             }
             CheckMeetingEntry(Time.deltaTime);
+            if(!Game.Player.Seat)CheckBumps(Game.Player.transform.position,Game.Player.Motion);
             if(Transported)Prompt="DOLLY ATTACHED / WALK BACKWARD TO PULL / Q RELEASE";
             if(Time.time>nextDecay){nextDecay=Time.time+8;SecurityAlert=Mathf.Max(0,SecurityAlert-1);}
         }
