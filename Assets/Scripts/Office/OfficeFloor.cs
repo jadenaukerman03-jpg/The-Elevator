@@ -256,8 +256,9 @@ namespace TheElevator.Office
             // What people are saying floats above their heads; the voices themselves are gibberish.
             SpeechBubbles.Draw(Game.Player.View,Employees);
             // No anger or suspicion counters: read each employee's face instead.
-            GUI.Box(new Rect(20,Screen.height-154,560,114),"");
-            GUI.Label(new Rect(34,Screen.height-146,530,100),"CONTRACT / "+Plan.TargetName.ToUpper()+"\n"+(RequiredRecovered?"REQUIRED ASSET SECURED":"MANDATORY / ROOM "+Plan.TargetRoom.ToString("000"))+"   |   COVER: FACILITIES ASSISTANT\nBADGE "+BadgeLevel+"   "+(Blending?"LOOKING PRODUCTIVE":""));
+            // The contract sits under the floor panel at top left, clear of the power and load panel.
+            GUI.Box(new Rect(24,160,336,70),"");
+            GUI.Label(new Rect(36,164,318,62),"CONTRACT / "+Plan.TargetName.ToUpper()+"\n"+(RequiredRecovered?"REQUIRED ASSET SECURED":"MANDATORY / ROOM "+Plan.TargetRoom.ToString("000"))+"\nBADGE "+BadgeLevel+"   |   COVER: FACILITIES ASSISTANT"+(Blending?"   |   LOOKING PRODUCTIVE":""));
         }
         void OnDestroy(){if(officeHum)Destroy(officeHum);if(tone)Destroy(tone);}
     }

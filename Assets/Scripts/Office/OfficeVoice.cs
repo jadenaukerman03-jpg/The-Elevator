@@ -12,7 +12,6 @@ namespace TheElevator.Office
         const int Rate = 22050, Harmonics = 14;
         // Formants glide from one vowel into the next over about 35 ms.
         static readonly float Glide = 1 - Mathf.Exp(-1f / (.035f * Rate));
-        static readonly float[] gains = new float[Harmonics + 1];
         // Vowel formants (F1, F2, F3): a, e, i, o, u, and the lazy "uh".
         static readonly Vector3[] Vowels = {
             new Vector3(750, 1250, 2600), new Vector3(520, 1850, 2550), new Vector3(330, 2250, 3000),
@@ -28,8 +27,19 @@ namespace TheElevator.Office
 
         // A spoken phrase. voice is the speaker's natural pitch in Hz (about 95 for a deep voice, 240 for a high one);
         // the same speaker saying the same phrase always sounds the same.
-        public static AudioClip Speak(string text, Tone tone, float voice, int speaker)
+        public static AudioClip Speak(string text, Tone tone, float voice, int speaker) { return ToClip(Samples(text, tone, voice, speaker), tone); }
+
+        public static AudioClip ToClip(float[] samples, Tone tone)
         {
+            AudioClip clip = AudioClip.Create("Office language / " + tone, samples.Length, 1, Rate, false);
+            clip.SetData(samples, 0);
+            return clip;
+        }
+
+        // The raw samples of a phrase. Pure computation (no Unity objects), so it can run on a worker thread.
+        public static float[] Samples(string text, Tone tone, float voice, int speaker)
+        {
+            float[] gains = new float[Harmonics + 1];
             float seconds = Duration(text, tone);
             int seed = speaker * 7919 + (text ?? "").GetHashCode();
             System.Random random = new System.Random(seed);
@@ -80,8 +90,13 @@ namespace TheElevator.Office
                             gains[k] = h > 4200 ? 0 : (Peak(h, f.x, 90) + .7f * Peak(h, f.y, 120) + .35f * Peak(h, f.z, 180)) / Mathf.Pow(k, 1.1f - strain * .5f);
                         }
                     }
-                    float voiced = 0;
-                    for (int k = 1; k <= Harmonics; k++) if (gains[k] > 0) voiced += Mathf.Sin(phase * k) * gains[k];
+                    // sin(k x) for every harmonic by rotating (sin x, cos x): two trig calls per sample instead of fourteen.
+                    float s1 = Mathf.Sin(phase), c1 = Mathf.Cos(phase), sk = s1, ck = c1, voiced = 0;
+                    for (int k = 1; k <= Harmonics; k++)
+                    {
+                        voiced += sk * gains[k];
+                        float next = sk * c1 + ck * s1; ck = ck * c1 - sk * s1; sk = next;
+                    }
                     // Breathiness and a little strain noise keep it from sounding like a synth.
                     breath = breath * .7f + Range(random, -1, 1) * .3f;
                     float envelope = Mathf.SmoothStep(0, 1, Mathf.Clamp01(i / (.02f * Rate))) * Mathf.SmoothStep(0, 1, Mathf.Clamp01((count - i) / (.05f * Rate)));
@@ -103,9 +118,7 @@ namespace TheElevator.Office
                 stressed = wordEnd;
                 cursor += Mathf.RoundToInt((wordEnd ? Range(random, .05f, .11f) * pace : Range(random, .005f, .02f)) * Rate);
             }
-            AudioClip clip = AudioClip.Create("Office language / " + tone, samples.Length, 1, Rate, false);
-            clip.SetData(samples, 0);
-            return clip;
+            return samples;
         }
 
         static float Peak(float frequency, float centre, float width) { float x = (frequency - centre) / width; return 1 / (1 + x * x); }

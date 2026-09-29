@@ -271,6 +271,9 @@ namespace TheElevator.Office
         readonly Queue<string> phrases = new Queue<string>();
         AudioSource voice;
         AudioClip spoken;
+        // Voice audio is synthesized on a worker thread; it starts playing as soon as it is ready.
+        System.Threading.Tasks.Task<float[]> synthesis;
+        OfficeVoice.Tone synthesisTone;
         float nextRant;
 
         public void Say(string line)
@@ -301,14 +304,26 @@ namespace TheElevator.Office
             voice.volume = SpeechTone == OfficeVoice.Tone.Calm ? .6f : SpeechTone == OfficeVoice.Tone.Upset ? .8f : 1f;
             voice.pitch = 1;
             voice.Stop();
+            string phrase = Speech; OfficeVoice.Tone tone = SpeechTone; float pitch = Voice; int speaker = EmployeeId;
+            synthesisTone = tone;
+            synthesis = System.Threading.Tasks.Task.Run(() => OfficeVoice.Samples(phrase, tone, pitch, speaker));
+        }
+
+        void PlaySynthesized()
+        {
+            if (synthesis == null || !synthesis.IsCompleted) return;
+            System.Threading.Tasks.Task<float[]> done = synthesis;
+            synthesis = null;
+            if (done.IsFaulted || Dead || !voice) return;
             if (spoken) Destroy(spoken);
-            spoken = OfficeVoice.Speak(Speech, SpeechTone, Voice, EmployeeId);
+            spoken = OfficeVoice.ToClip(done.Result, synthesisTone);
             voice.clip = spoken;
             voice.Play();
         }
 
         void UpdateSpeech()
         {
+            PlaySynthesized();
             if (phrases.Count > 0 && Time.time >= PhraseUntil + PhraseGap) NextPhrase();
         }
     }

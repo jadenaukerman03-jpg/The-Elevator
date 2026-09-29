@@ -299,6 +299,15 @@ namespace TheElevator
             if (Health <= 0) GoDown();
         }
 
+        // Points the view at a world position (cutscenes, tests).
+        public void FaceTowards(Vector3 point)
+        {
+            Vector3 eye = transform.position + Vector3.up * eyeHeight, delta = point - eye;
+            yaw = Mathf.Atan2(delta.x, delta.z) * Mathf.Rad2Deg;
+            pitch = Mathf.Clamp(-Mathf.Atan2(delta.y, new Vector2(delta.x, delta.z).magnitude) * Mathf.Rad2Deg, -65, 75);
+            transform.rotation = Quaternion.Euler(0, yaw, 0);
+        }
+
         public void HealForValidation() { Health = MaxHealth; hurtFlash = 0; }
 
         void GoDown()
