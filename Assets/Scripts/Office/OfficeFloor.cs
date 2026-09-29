@@ -191,6 +191,7 @@ namespace TheElevator.Office
                 { Questioner.Suspicion=Mathf.Max(0,Questioner.Suspicion-(BadgeLevel>=2?25:10));nextBluff=Time.time+20;Game.Notify("Identity check deferred. Try looking busy."); }
             }
             CheckMeetingEntry(Time.deltaTime);
+            UpdateConversations();UpdatePresenter();
             if(!Game.Player.Seat)CheckBumps(Game.Player.transform.position,Game.Player.Motion);
             if(Transported)Prompt="DOLLY ATTACHED / WALK BACKWARD TO PULL / Q RELEASE";
             if(Time.time>nextDecay){nextDecay=Time.time+8;SecurityAlert=Mathf.Max(0,SecurityAlert-1);}
@@ -245,9 +246,8 @@ namespace TheElevator.Office
         void OnGUI()
         {
             if(!Game||!Game.ControlsActive)return;
-            // The presenter's words, shown as a subtitle while you are in the room with them.
-            if(playerInMeeting)
-                GUI.Box(new Rect(Screen.width*.5f-300,Screen.height-205,600,35),"PRESENTER: "+MeetingLine);
+            // What people are saying floats above their heads; the voices themselves are gibberish.
+            SpeechBubbles.Draw(Game.Player.View,Employees);
             // No anger or suspicion counters: read each employee's face instead.
             GUI.Box(new Rect(20,Screen.height-154,560,114),"");
             GUI.Label(new Rect(34,Screen.height-146,530,100),"CONTRACT / "+Plan.TargetName.ToUpper()+"\n"+(RequiredRecovered?"REQUIRED ASSET SECURED":"MANDATORY / ROOM "+Plan.TargetRoom.ToString("000"))+"   |   COVER: FACILITIES ASSISTANT\nBADGE "+BadgeLevel+"   "+(Blending?"LOOKING PRODUCTIVE":""));

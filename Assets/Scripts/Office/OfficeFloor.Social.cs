@@ -90,7 +90,7 @@ namespace TheElevator.Office
             OfficeEmployee owner=cargo.Workstation?cargo.Workstation.Occupant:null;
             bool disturbed=owner&&!owner.Travelling&&Vector3.Distance(owner.transform.position,cargo.Workstation.transform.position)<.8f;
             ReportAction(Game.Player.transform.position,22,disturbed?owner:null);
-            if(disturbed){owner.React(62,"I was using that computer. Put it back.");cargo.Workstation.Equipment=null;cargo.Workstation.EquipmentMissing=true;}
+            if(disturbed){owner.React(100,"I was using that computer. Put it back.",Grievance.Computer);cargo.Workstation.Equipment=null;cargo.Workstation.EquipmentMissing=true;}
         }
         // The presenter always stands; roughly three of every four chairs around the table are taken.
         void PopulateMeeting()
@@ -121,6 +121,60 @@ namespace TheElevator.Office
             playerInMeeting=Map.NearestRoom(Game.Player.transform.position).Id==Plan.MeetingRoom;
         }
         readonly HashSet<OfficeEmployee> touching=new HashSet<OfficeEmployee>();
+        // ---- Hallway conversations ----
+        // Two colleagues passing each other either walk on (half the time) or stop and chat, taking turns.
+        sealed class Chat { public OfficeEmployee A,B; public string[] Lines; public int Next; public float At; }
+        readonly List<Chat> chats=new List<Chat>();
+        readonly Dictionary<long,float> passed=new Dictionary<long,float>();
+        readonly System.Random chatter=new System.Random(4242);
+        float nextChatScan,nextPresenterLine;
+        public int ActiveConversations { get { return chats.Count; } }
+        static bool Free(OfficeEmployee e){return e&&!e.Partner&&!e.Chasing&&!e.Pushed&&!e.Blinded&&e.AngerLevel<3&&!e.Robot.Seated;}
+        void UpdateConversations()
+        {
+            if(Time.time>=nextChatScan)
+            {
+                nextChatScan=Time.time+.25f;
+                List<OfficeEmployee> walking=Employees.FindAll(e=>e.Travelling&&Free(e));
+                for(int i=0;i<walking.Count;i++)for(int j=i+1;j<walking.Count;j++)
+                {
+                    OfficeEmployee a=walking[i],b=walking[j];
+                    if(a.Partner||b.Partner)continue;
+                    Vector3 gap=a.transform.position-b.transform.position;if(Mathf.Abs(gap.y)>.5f)continue;gap.y=0;
+                    if(gap.sqrMagnitude>1.9f*1.9f)continue;
+                    long key=Mathf.Min(a.EmployeeId,b.EmployeeId)*100000L+Mathf.Max(a.EmployeeId,b.EmployeeId);
+                    if(passed.TryGetValue(key,out float until)&&Time.time<until)continue;
+                    passed[key]=Time.time+45;
+                    if(chatter.NextDouble()<.5)StartConversation(a,b);
+                }
+            }
+            for(int i=chats.Count-1;i>=0;i--)
+            {
+                Chat chat=chats[i];
+                bool broken=!chat.A||!chat.B||chat.A.Partner!=chat.B||chat.B.Partner!=chat.A||chat.A.AngerLevel>=3||chat.B.AngerLevel>=3||chat.A.Pushed||chat.B.Pushed;
+                if(broken||(chat.Next>=chat.Lines.Length&&Time.time>=chat.At)){EndConversation(chat);chats.RemoveAt(i);continue;}
+                if(Time.time<chat.At)continue;
+                OfficeEmployee speaker=chat.Next%2==0?chat.A:chat.B;
+                speaker.Say(chat.Lines[chat.Next++]);
+                chat.At=speaker.SpeechUntil+.35f;
+            }
+        }
+        public bool StartConversation(OfficeEmployee a,OfficeEmployee b)
+        {
+            if(!Free(a)||!Free(b)||a==b)return false;
+            a.Partner=b;b.Partner=a;
+            chats.Add(new Chat{A=a,B=b,Lines=OfficeDialogue.Conversations[chatter.Next(OfficeDialogue.Conversations.Length)],At=Time.time+.4f});
+            return true;
+        }
+        static void EndConversation(Chat chat){if(chat.A&&chat.A.Partner==chat.B)chat.A.Partner=null;if(chat.B&&chat.B.Partner==chat.A)chat.B.Partner=null;}
+        // The presenter keeps presenting; their words show in a bubble while you are in the room.
+        void UpdatePresenter()
+        {
+            if(!playerInMeeting||Time.time<nextPresenterLine)return;
+            OfficeEmployee presenter=Employees.Find(IsMeetingSpeaker);
+            if(!presenter||presenter.AngerLevel>=3)return;
+            presenter.Say(MeetingLine);nextPresenterLine=presenter.SpeechUntil+1.2f;
+        }
         // Bumping: walking into an employee (seated or standing) raises that one employee's anger by one level.
         // Each contact counts once; step away and walk into them again to bump again.
         public int CheckBumps(Vector3 position,Vector3 motion)
@@ -130,10 +184,13 @@ namespace TheElevator.Office
             {
                 Vector3 delta=employee.transform.position-position;float height=delta.y;delta.y=0;float gap=delta.magnitude;
                 bool contact=gap<.74f&&Mathf.Abs(height)<1;
+                bool into=contact&&motion.magnitude>.5f&&Vector3.Dot(motion.normalized,delta.normalized)>.3f;
+                // Walking into someone pushes them out of the way for as long as you keep walking into them.
+                if(into)employee.Shove(delta.normalized*motion.magnitude*.95f);
                 if(contact&&!touching.Contains(employee))
                 {
                     touching.Add(employee);
-                    if(motion.magnitude>.5f&&Vector3.Dot(motion.normalized,delta.normalized)>.3f){employee.Bump();bumps++;}
+                    if(into){employee.Bump();bumps++;}
                 }
                 else if(!contact&&gap>.95f)touching.Remove(employee);
             }

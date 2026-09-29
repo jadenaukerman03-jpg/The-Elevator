@@ -31,6 +31,9 @@ namespace TheElevator
         // Intended walking velocity this frame (what the player is steering, before collisions).
         public Vector3 Motion { get; private set; }
         public TheElevator.Office.OfficeSeat Seat { get; private set; }
+        // Extinguisher foam on the face (0 clear, 1 covered). It smears your view and wears off over a few seconds.
+        public float FaceFoam { get; private set; }
+        static Texture2D foamBlot;
         // Seated view: a little lower than standing, so sitting reads as sitting.
         public const float SeatedEyeHeight=1.22f;
         TheElevator.Office.OfficeSeat seatTarget;
@@ -100,6 +103,7 @@ namespace TheElevator
             }
             if(ReadingNotebook)return;
             damageCooldown -= Time.deltaTime;
+            FaceFoam = Mathf.MoveTowards(FaceFoam, 0, Time.deltaTime / 7f);
             yaw += Input.GetAxisRaw("Mouse X") * 2.1f;
             pitch = Mathf.Clamp(pitch - Input.GetAxisRaw("Mouse Y") * 1.8f, -65, 75);
             if (Seat) { UpdateSeated(); return; }
@@ -272,6 +276,39 @@ namespace TheElevator
             knockback = Vector3.MoveTowards(knockback, wind, Time.deltaTime * 30);
         }
 
+        public void Foam(float amount) { FaceFoam = Mathf.Clamp01(FaceFoam + amount); }
+
+        // Soft white blots over the view plus a milky wash: the screen equivalent of foam on your face.
+        void DrawFaceFoam()
+        {
+            if (FaceFoam <= .01f || Event.current.type != EventType.Repaint) return;
+            if (!foamBlot)
+            {
+                const int size = 64;
+                foamBlot = new Texture2D(size, size, TextureFormat.RGBA32, false) { name = "Foam blot", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+                for (int y = 0; y < size; y++) for (int x = 0; x < size; x++)
+                {
+                    float d = new Vector2(x - size * .5f + .5f, y - size * .5f + .5f).magnitude / (size * .5f);
+                    foamBlot.SetPixel(x, y, new Color(1, 1, 1, Mathf.SmoothStep(1, 0, Mathf.InverseLerp(.35f, 1, d))));
+                }
+                foamBlot.Apply();
+            }
+            Color old = GUI.color;
+            GUI.color = new Color(.97f, .98f, 1f, FaceFoam * .45f);
+            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+            float h = Screen.height;
+            Vector3[] blots = { new Vector3(.18f, .25f, .75f), new Vector3(.72f, .2f, .6f), new Vector3(.45f, .55f, .9f), new Vector3(.1f, .75f, .7f), new Vector3(.85f, .7f, .8f), new Vector3(.55f, .9f, .6f), new Vector3(.32f, .05f, .5f) };
+            for (int i = 0; i < blots.Length; i++)
+            {
+                float coverage = Mathf.Clamp01(FaceFoam * 1.6f - i * .12f);
+                if (coverage <= 0) continue;
+                float size = blots[i].z * h * (.6f + coverage * .4f);
+                GUI.color = new Color(.98f, .99f, 1f, coverage * .92f);
+                GUI.DrawTexture(new Rect(blots[i].x * Screen.width - size * .5f, blots[i].y * h - size * .5f, size, size), foamBlot);
+            }
+            GUI.color = old;
+        }
+
         public bool Sit(TheElevator.Office.OfficeSeat seat)
         {
             if (!seat || Held || Seat || !seat.Free(game.CurrentOffice)) return false;
@@ -315,7 +352,9 @@ namespace TheElevator
 
         void OnGUI()
         {
-            if(!game||!game.ControlsActive||!Held||ReadingNotebook||PreviewAvatar)return;
+            if(!game||!game.ControlsActive||ReadingNotebook||PreviewAvatar)return;
+            DrawFaceFoam();
+            if(!Held)return;
             // Throw strength and item usage share one ring around the cursor.
             if(ChargingThrow){CursorGauge.Draw(ThrowCharge,Color.Lerp(new Color(1,.85f,.3f),new Color(1,.3f,.12f),ThrowCharge));return;}
             FireExtinguisher extinguisher=Held.GetComponent<FireExtinguisher>();

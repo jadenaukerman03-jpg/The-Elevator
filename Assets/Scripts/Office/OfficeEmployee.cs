@@ -67,28 +67,73 @@ namespace TheElevator.Office
         }
         public bool Sees(Vector3 position)
         {
+            // Foam on the face: they can't see anything until they've wiped it off.
+            if(Blinded)return false;
             bool crouched=Office.Game&&Office.Game.Player.Crouched&&(position-Office.Game.Player.transform.position).sqrMagnitude<2;
             Vector3 eye=transform.position+Vector3.up*(Robot&&Robot.Seated?WorkerController.EyeHeight-.04f:WorkerController.EyeHeight);
             Vector3 target=position+Vector3.up*(crouched?.64f:1.15f),delta=target-eye;
             if(delta.magnitude>(crouched?8:11)||Vector3.Angle(transform.forward,delta)>72)return false;
             return !Physics.Raycast(eye+transform.forward*.14f,(target-eye-transform.forward*.14f).normalized,Mathf.Max(0,delta.magnitude-.4f),~((1<<2)|(1<<8)),QueryTriggerInteraction.Ignore);
         }
-        public void React(float amount,string reason)
+        public void React(float amount,string reason,Grievance grievance=Grievance.Theft)
         {
-            Suspicion=Mathf.Clamp(Suspicion+amount,0,100);attentionUntil=Time.time+7;
-            if(Office.Game){LastObservedPosition=Office.Game.Player.transform.position;Robot.LookTarget=LastObservedPosition+Vector3.up*(Office.Game.Player.Crouched?WorkerController.CrouchEyeHeight:WorkerController.EyeHeight);Office.Questioner=this;Office.Game.Notify(Job+": "+reason);}
+            Suspicion=Mathf.Clamp(Suspicion+amount,0,100);attentionUntil=Time.time+7;Complaint=grievance;
+            if(Office.Game){LastObservedPosition=Office.Game.Player.transform.position;Robot.LookTarget=LastObservedPosition+Vector3.up*(Office.Game.Player.Crouched?WorkerController.CrouchEyeHeight:WorkerController.EyeHeight);Office.Questioner=this;}
+            Say(AngerLevel>=5?OfficeDialogue.Rage(grievance,random):reason);
+        }
+        // ---- Speech: the made-up office language, with what they mean shown in a bubble over their head ----
+        public string Speech { get; private set; }
+        public float SpeechUntil { get; private set; }
+        public OfficeVoice.Tone SpeechTone { get; private set; }
+        public bool Speaking { get { return !string.IsNullOrEmpty(Speech)&&Time.time<SpeechUntil; } }
+        public Grievance Complaint { get; private set; }
+        // Each employee has their own voice pitch.
+        public float VoicePitch { get { return .82f+EmployeeId*37%9*.05f; } }
+        AudioSource voice;
+        float nextRant;
+        public void Say(string text)
+        {
+            SpeechTone=OfficeVoice.ToneFor(AngerLevel);
+            float seconds=OfficeVoice.Duration(text,SpeechTone);
+            Speech=text;SpeechUntil=Time.time+seconds;nextRant=Time.time+seconds+1+(float)random.NextDouble()*1.5f;
+            if(!Office.Game)return;
+            if(!voice)
+            {
+                voice=gameObject.AddComponent<AudioSource>();voice.playOnAwake=false;voice.spatialBlend=1;voice.dopplerLevel=0;
+                voice.rolloffMode=AudioRolloffMode.Linear;voice.minDistance=1.5f;
+            }
+            voice.maxDistance=SpeechTone==OfficeVoice.Tone.Yelling?30:16;
+            voice.volume=SpeechTone==OfficeVoice.Tone.Calm?.55f:SpeechTone==OfficeVoice.Tone.Upset?.75f:1f;
+            voice.pitch=VoicePitch;voice.clip=OfficeVoice.Clip(SpeechTone,seconds*VoicePitch,random.Next());voice.Play();
         }
         // Suspicion that puts the face in the middle of each anger level (index = level).
         static readonly float[] AngerMidpoint={0,0,20,40,62,88};
         // Walking into someone is what annoys them: each bump raises this employee's anger by exactly one level.
         public void Bump()
         {
-            Suspicion=Mathf.Max(Suspicion,AngerMidpoint[Mathf.Min(5,AngerLevel+1)]);attentionUntil=Time.time+4;
-            if(Office.Game){LastObservedPosition=Office.Game.Player.transform.position;Office.Game.Notify(Job+": Hey! Watch where you're going.");}
+            Suspicion=Mathf.Max(Suspicion,AngerMidpoint[Mathf.Min(5,AngerLevel+1)]);attentionUntil=Time.time+4;Complaint=Grievance.Bump;
+            if(Office.Game)LastObservedPosition=Office.Game.Player.transform.position;
+            Say(OfficeDialogue.ReactionFor(AngerLevel,Grievance.Bump,random));
+        }
+        // Hit by extinguisher foam: instantly furious. Foam in the face blinds them until they wipe it off.
+        float blindUntil;
+        bool wiping;
+        public bool Blinded { get { return Time.time<blindUntil; } }
+        public void Foamed(bool face)
+        {
+            bool first=AngerLevel<5;
+            Suspicion=Mathf.Max(Suspicion,AngerMidpoint[5]);Complaint=Grievance.Foam;attentionUntil=Time.time+4;
+            if(face)blindUntil=Mathf.Min(Time.time+8,Mathf.Max(blindUntil,Time.time+2)+.3f);
+            if(Office.Game)LastObservedPosition=Office.Game.Player.transform.position;
+            if(first||(!Speaking&&Time.time>nextRant))Say(OfficeDialogue.Rage(Grievance.Foam,random));
         }
         Vector3 push;
         float windUntil;
         public bool Pushed { get { return push.sqrMagnitude>.01f; } }
+        bool shovedByPlayer;
+        float glareUntil;
+        // The player walking into a standing employee shoves them out of the way.
+        public void Shove(Vector3 motion){if(Robot.Seated)return;Push(motion);shovedByPlayer=true;}
         // A steady shove, like a strong wind: while it keeps blowing the employee slides along with it.
         public void Push(Vector3 wind)
         {
@@ -101,6 +146,8 @@ namespace TheElevator.Office
             motor.Move((push+Vector3.down*5)*Time.deltaTime);
             if(Time.time>windUntil)push=Vector3.MoveTowards(push,Vector3.zero,Time.deltaTime*7);
             if(Pushed)return;
+            // Shoved by the player: stop for a moment, glare at them and say so.
+            if(shovedByPlayer){shovedByPlayer=false;glareUntil=Time.time+1.4f;attentionUntil=Time.time+3;Say(OfficeDialogue.ReactionFor(AngerLevel,Grievance.Shove,random));}
             // Once the wind stops, walk back to wherever they were going.
             if(!Travelling&&Station&&!AtStation&&!TryTravel(Station)){route.Clear();route.Add(Station.transform.position);}
         }
@@ -143,24 +190,28 @@ namespace TheElevator.Office
                 if(IsSecurity&&Office.Alarm&&distance<1.25f&&Sees(Office.Game.Player.transform.position))Office.Game.Player.Knock(transform.position);
                 if(!Travelling&&CoffeeStage<0&&Time.time>nextTask&&Suspicion<40&&!Supervisor&&HomeRoom!=Office.Plan.MeetingRoom&&HomeStation.Activity!=OfficeTask.Reception)ChooseTask();
             }
+            UpdateChase(distance);
             // A started trip always completes, even when the player leaves: no frozen doorway occupants.
             if(Pushed)Shoved();
+            else if(Blinded||Time.time<glareUntil||Partner)Hold();
             else if(Travelling)Walk();
-            else if(Station&&AtStation)
+            else if(Station&&AtStation&&!Chasing)
             {
                 motor.enabled=false;Robot.Seated=Station.Seated;Robot.Activity=Station.Activity;
                 if(Station.Coffee)TickCoffee(Time.deltaTime);
                 else if(Station.EquipmentMissing){State="Workstation missing";Robot.Activity=OfficeTask.Reading;}
                 else State=Station.Activity==OfficeTask.Meeting?"Discussing quarterly targets":"Working";
             }
-            if(Time.time<attentionUntil)Robot.LookTarget=Office.Game.Player.transform.position+Vector3.up*(Office.Game.Player.Crouched?WorkerController.CrouchEyeHeight:WorkerController.EyeHeight);
+            if(wiping&&!Blinded){wiping=false;Robot.Reaching=Cup;}
+            if(Partner&&Time.time>=attentionUntil)Robot.LookTarget=Partner.Robot.Head?Partner.Robot.Head.position:Partner.transform.position+Vector3.up*1.3f;
+            else if(Time.time<attentionUntil)Robot.LookTarget=Office.Game.Player.transform.position+Vector3.up*(Office.Game.Player.Crouched?WorkerController.CrouchEyeHeight:WorkerController.EyeHeight);
             else if(Station&&Station.Activity==OfficeTask.Meeting)
             {
                 OfficeEmployee colleague=Office.Employees.Find(e=>e!=this&&e.Station&&e.Station.RoomId==Station.RoomId&&!e.Travelling);
                 Robot.LookTarget=colleague?colleague.transform.position+Vector3.up*1.2f:Vector3.zero;
             }
             else Robot.LookTarget=Vector3.zero;
-            Robot.Talking=Office.IsMeetingSpeaker(this);
+            Robot.Talking=Office.IsMeetingSpeaker(this)||Speaking;
             if(Robot.Activity==OfficeTask.Present)Robot.PointAt=Office.BoardPoint(Time.time);
             Robot.Mood=AngerLevel;
             Robot.Speed=Vector3.Distance(transform.position,previous)/Mathf.Max(.001f,Time.deltaTime);previous=transform.position;
@@ -173,7 +224,7 @@ namespace TheElevator.Office
         {
             Robot.Seated=false;motor.enabled=true;
             while(route.Count>0&&(new Vector2(transform.position.x-route[0].x,transform.position.z-route[0].z)).magnitude<.085f&&Mathf.Abs(transform.position.y-route[0].y)<.5f){route.RemoveAt(0);bestWaypointDistance=float.MaxValue;stuckTime=0;}
-            if(route.Count==0){Arrive();return;}
+            if(route.Count==0){if(!Chasing)Arrive();return;}
             Vector3 delta=route[0]-transform.position;delta.y=0;Vector3 heading=delta.normalized;
             bool wait=false;
             foreach(OfficeDoor door in Office.Doors)if(Vector3.Distance(door.transform.position,transform.position)<2.5f&&!door.RequestPass(this))wait=true;
@@ -192,7 +243,7 @@ namespace TheElevator.Office
             {
                 transform.rotation=Quaternion.RotateTowards(transform.rotation,Quaternion.LookRotation(desired),160*Time.deltaTime);
                 float alignment=Mathf.Clamp(Vector3.Dot(transform.forward,desired),.25f,1);
-                motor.Move((desired*1.22f*alignment+Vector3.down*5)*Time.deltaTime);
+                motor.Move((desired*(Chasing?2.1f:1.22f)*alignment+Vector3.down*5)*Time.deltaTime);
             }
             else
             {
@@ -202,12 +253,58 @@ namespace TheElevator.Office
             }
             float remaining=Vector3.Distance(transform.position,route[0]);
             if(remaining<bestWaypointDistance-.05f){bestWaypointDistance=remaining;stuckTime=0;}else stuckTime+=Time.deltaTime;
+            if(stuckTime>3.5f&&Chasing){stuckTime=0;route.Clear();nextChasePlan=0;return;}
             if(stuckTime>3.5f)
             {
                 stuckTime=0;recoveryAttempts++;
                 OfficeTaskPoint target=recoveryAttempts<3?Station:HomeStation;
                 route.Clear();if(!TryTravel(target)){nextTask=Time.time+3+EmployeeId*.13f;State="Replanning around obstruction";}
             }
+        }
+        // Standing still: glaring at the player, wiping foam off their face, or chatting with a colleague.
+        void Hold()
+        {
+            Vector3 face=Vector3.zero;
+            if(Blinded)
+            {
+                State="Wiping foam off";wiping=true;Robot.Reaching=true;
+                if(Robot.Head)Robot.ReachTarget=Robot.Head.position+transform.forward*.2f-Vector3.up*.05f;
+            }
+            else if(Partner){State="Chatting";face=Partner.transform.position;}
+            else{State="Glaring";face=Office.Game.Player.transform.position;}
+            Vector3 toward=face-transform.position;toward.y=0;
+            if(face!=Vector3.zero&&toward.sqrMagnitude>.01f&&!Robot.Seated)transform.rotation=Quaternion.RotateTowards(transform.rotation,Quaternion.LookRotation(toward),240*Time.deltaTime);
+        }
+        // Hallway conversation partner, set by the floor while two colleagues stop to talk.
+        public OfficeEmployee Partner;
+        // ---- Level 5: get up and go after the player, yelling ----
+        public bool Chasing { get; private set; }
+        float nextChasePlan;
+        readonly List<Vector3> chaseRoute=new List<Vector3>();
+        void UpdateChase(float distance)
+        {
+            bool want=AngerLevel>=5&&!Office.Game.Player.InCabin&&distance<30;
+            if(!want)
+            {
+                if(!Chasing)return;
+                // Calmed down: go back to where they belong.
+                Chasing=false;route.Clear();nextTask=Time.time+5;
+                if(Station&&!AtStation&&!TryTravel(Station))route.Add(Station.transform.position);
+                return;
+            }
+            if(!Chasing)
+            {
+                Chasing=true;Partner=null;nextChasePlan=0;Robot.Seated=false;motor.enabled=true;
+                if(CoffeeStage>=0){CoffeeStage=-1;if(Station&&Station.Coffee)Station.Coffee.SetOpen(0);if(stream)Destroy(stream.gameObject);stream=null;}
+            }
+            State="Confronting the intruder";attentionUntil=Mathf.Max(attentionUntil,Time.time+.5f);
+            if(!Speaking&&Time.time>=nextRant)Say(OfficeDialogue.Rage(Complaint,random));
+            if(Blinded||Pushed)return;
+            if(distance<1.5f){route.Clear();Robot.Seated=false;Vector3 toward=Office.Game.Player.transform.position-transform.position;toward.y=0;if(toward.sqrMagnitude>.01f)transform.rotation=Quaternion.RotateTowards(transform.rotation,Quaternion.LookRotation(toward),240*Time.deltaTime);return;}
+            if(Time.time<nextChasePlan)return;
+            nextChasePlan=Time.time+1.2f;
+            Vector3 target=Office.Game.Player.transform.position;
+            if(OfficeNavigation.Build(this,Office.Map.NearestRoom(target).Id,target,chaseRoute)){route.Clear();route.AddRange(chaseRoute);bestWaypointDistance=float.MaxValue;}
         }
         void Arrive()
         {

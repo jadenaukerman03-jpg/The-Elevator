@@ -53,16 +53,22 @@ namespace TheElevator.Office
         public static bool Build(OfficeEmployee employee,OfficeTaskPoint target,List<Vector3> result)
         {
             planning=employee;
-            try{return BuildRoute(employee,target,result);}finally{planning=null;}
+            try{return BuildRoute(employee,target.RoomId,target.transform.position,result);}finally{planning=null;}
         }
-        static bool BuildRoute(OfficeEmployee employee,OfficeTaskPoint target,List<Vector3> result)
+        // A route to any reachable point, e.g. an angry employee walking over to the player.
+        public static bool Build(OfficeEmployee employee,int room,Vector3 point,List<Vector3> result)
+        {
+            planning=employee;
+            try{return BuildRoute(employee,room,point,result);}finally{planning=null;}
+        }
+        static bool BuildRoute(OfficeEmployee employee,int targetRoom,Vector3 targetPoint,List<Vector3> result)
         {
             result.Clear();OfficeFloor office=employee.Office;int from=office.Map.NearestRoom(employee.transform.position).Id;
-            List<int> rooms=RoomPath(employee,from,target.RoomId);if(rooms.Count==0)return false;
+            List<int> rooms=RoomPath(employee,from,targetRoom);if(rooms.Count==0)return false;
             List<Vector3> coarse=new List<Vector3>();coarse.Add(employee.transform.position);
             coarse.Add(office.Map.Anchor(office.Map.Manifest.Rooms[from]));
             for(int i=1;i<rooms.Count;i++)coarse.AddRange(office.Map.Route(rooms[i-1],rooms[i]));
-            coarse.Add(office.Map.Anchor(office.Map.Manifest.Rooms[target.RoomId]));coarse.Add(target.transform.position);
+            coarse.Add(office.Map.Anchor(office.Map.Manifest.Rooms[targetRoom]));coarse.Add(targetPoint);
             Vector3 last=coarse[0];
             for(int i=1;i<coarse.Count;i++)
             {

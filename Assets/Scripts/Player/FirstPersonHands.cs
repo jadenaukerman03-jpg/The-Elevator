@@ -108,13 +108,23 @@ namespace TheElevator
             Vector3 hinge=t.InverseTransformPoint(position+rotation*new Vector3(0,FingerHinge,PalmHalfThickness))-center;
             MaxContactError=Mathf.Max(MaxContactError,Mathf.Abs(hinge.z+extent.z)+Mathf.Abs(Mathf.Abs(hinge.x)-extent.x));
         }
-        // Right hand on the nozzle like holding a torch: the wrist comes from behind, the palm lies along the
-        // nozzle's right side and the fingers curl over it toward the horn.
+        // Right hand around the nozzle's pistol grip: the palm sits behind the grip facing forward, the fingers
+        // reach across it and curl around its front. Nothing of the hand passes through the nozzle.
+        public static readonly Vector3 NozzlePalm=new Vector3(.02f,-.065f,-.1f);
         static void NozzleGrip(Transform nozzle,out Vector3 position,out Quaternion rotation)
         {
-            rotation=Quaternion.LookRotation(nozzle.TransformDirection(Vector3.left),nozzle.TransformDirection(new Vector3(0,.3f,1)));
-            position=nozzle.TransformPoint(new Vector3(.016f+PalmHalfThickness,-.01f,-.075f));
+            rotation=Quaternion.LookRotation(nozzle.forward,nozzle.TransformDirection(Vector3.left));
+            position=nozzle.TransformPoint(NozzlePalm);
         }
+        // How many points of the right mitten are inside the extinguisher nozzle (should be none).
+        public int RightHandInside(FireExtinguisher extinguisher)
+        {
+            if(right==null||!extinguisher)return 0;
+            int inside=0;
+            foreach(Vector3 v in right.Mesh.vertices)if(extinguisher.InsideNozzle(right.Root.TransformPoint(v)))inside++;
+            return inside;
+        }
+        public Transform RightHand{get{return right!=null?right.Root:null;}}
         void OnDestroy()
         {
             foreach(Hand hand in new[]{left,right})if(hand!=null&&hand.Mesh)Destroy(hand.Mesh);

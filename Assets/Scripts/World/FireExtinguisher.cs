@@ -23,6 +23,7 @@ namespace TheElevator
         const float HoseRadius = .011f, Cone = 12;
         const int HoseSegments = 16, HoseSides = 8;
 
+        public static readonly Vector3 HandleCentre = new Vector3(0, -.05f, -.035f), HandleSize = new Vector3(.03f, .085f, .034f);
         SalvageItem item;
         DescentGame game;
         Transform valve;
@@ -65,6 +66,8 @@ namespace TheElevator
             grip.transform.localRotation = Quaternion.Euler(90, 0, 0);
             GameObject horn = a.Round(Nozzle, "Nozzle horn", new Vector3(0, 0, .06f), new Vector3(.046f, .036f, .046f), a.Dark);
             horn.transform.localRotation = Quaternion.Euler(90, 0, 0);
+            // A pistol grip under the nozzle: that is what the right hand closes around.
+            a.Box(Nozzle, "Nozzle pistol grip", HandleCentre, HandleSize, a.Metal);
             RestPose();
 
             GameObject tube = new GameObject("Hose");
@@ -79,6 +82,17 @@ namespace TheElevator
         void RestPose() { Nozzle.localPosition = RestNozzle; Nozzle.localRotation = Quaternion.Euler(90, 0, 0); }
 
         public Vector3 Tip { get { return Nozzle.TransformPoint(0, 0, .1f); } }
+
+        // Whether a world point is inside the nozzle (barrel, horn or pistol grip); used to keep the hand outside it.
+        public bool InsideNozzle(Vector3 world)
+        {
+            Vector3 p = Nozzle.InverseTransformPoint(world);
+            float radial = p.x * p.x + p.y * p.y;
+            if (p.z > -.055f && p.z < .025f && radial < .016f * .016f) return true;
+            if (p.z >= .025f && p.z < .095f && radial < .023f * .023f) return true;
+            Vector3 h = p - HandleCentre;
+            return Mathf.Abs(h.x) < HandleSize.x * .5f && Mathf.Abs(h.y) < HandleSize.y * .5f && Mathf.Abs(h.z) < HandleSize.z * .5f;
+        }
 
         // Called by the holder after the camera has moved: the nozzle sits in the right hand, aimed at the crosshair.
         public void PoseHeld(Transform view)
@@ -105,7 +119,7 @@ namespace TheElevator
             if (!Spraying) return;
             Remaining = Mathf.Max(0, Remaining - dt);
             Vector3 tip = Tip, direction = Nozzle.forward;
-            FoamSpray.Get(game ? game.CurrentOffice ? game.CurrentOffice.transform : game.transform : transform.parent).Emit(tip, direction, user ? user.Motion : Vector3.zero, dt);
+            FoamSpray.Get(game ? game.CurrentOffice ? game.CurrentOffice.transform : game.transform : transform.parent).Emit(tip, direction, user ? user.Motion : Vector3.zero, dt, user);
             Blow(user, tip, direction);
             if (game && Time.time > nextHiss) { nextHiss = Time.time + .08f; game.Sound.Play(1300 + Random.Range(-150, 150), .07f, .025f); }
             if (Empty && game) game.Notify("The extinguisher is empty.");

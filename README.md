@@ -31,9 +31,13 @@ Office staff dress for their job: associate, receptionist (headset), technician 
 
 ### Anger and the boardroom
 
-There are no suspicion or incident meters. Every employee has their own anger, starting calm (1) and rising to furious (5); read it on their face: a resting face, then annoyed, irritated, angry, and finally red-faced and shouting. Walking, running or sitting near people does not upset them. Walking into someone does: each bump raises that one employee's anger by one level. Being seen carrying stolen property still makes them suspicious. Anger slowly cools again.
+There are no suspicion or incident meters. Every employee has their own anger, starting calm (1) and rising to furious (5); read it on their face: a resting face, then annoyed, irritated, angry, and finally red-faced and shouting. Walking, running or sitting near people does not upset them. Walking into someone does: each bump raises that one employee's anger by one level. Keep walking into a standing employee and you shove them out of the way; afterwards they stop for a moment, glare at you and tell you off. Spraying anyone with extinguisher foam makes them furious (level 5) straight away. At level 5 an employee gets up from whatever they were doing and comes after you, yelling about what you did, until they cool down. Being seen carrying stolen property still makes them suspicious. Anger slowly cools again.
 
 Most floors hide a boardroom: a dead-end room two rooms long with one door, a long table ringed by mostly occupied chairs, and a presenter at the far end pointing a stick at the quarterly chart. You may walk in and listen; nobody minds unless you bump into them.
+
+### Office talk
+
+Employees speak a made-up language: you hear gibberish, and a flat speech bubble above their head (always facing you) shows what they mean. Their voice follows their anger: calm at levels 1-2, tense and upset at 3-4, and yelling at 5, when the bubble turns red and the words get rude (never swearing). Two colleagues passing in a hallway either walk on or, half the time, stop for a proper chat about reports, printers, lunch plans and so on. In the boardroom the presenter's words appear above their head.
 
 ### Sitting
 
@@ -41,7 +45,7 @@ Every desk chair, boardroom chair, armchair and sofa cushion is a seat. Look at 
 
 ### Fire extinguishers
 
-One room in four has a fire extinguisher hanging on a wall bracket. It is worth $10. Pick it up and the left hand carries the canister while the right hand aims the nozzle on its hose. Hold the left mouse button to spray white foam. Anyone in the stream is pushed back like a strong wind for as long as you keep spraying. The foam is only visual and melts away about 20 seconds after it lands. A full extinguisher sprays for 12 seconds in total; stopping early keeps the rest, and an empty one stops spraying. The ring around the cursor fills as you use it up.
+One room in four has a fire extinguisher hanging on a wall bracket. It is worth $10. Pick it up and the left hand carries the canister while the right hand aims the nozzle on its hose. Hold the left mouse button to spray white foam. Anyone in the stream is pushed back like a strong wind for as long as you keep spraying. Foam sticks to the people it hits; in the face it blinds them until they wipe it off (a player sees their view covered in foam for a few seconds). On the ground it melts away about 20 seconds after it lands. A full extinguisher sprays for 12 seconds in total; stopping early keeps the rest, and an empty one stops spraying. The ring around the cursor fills as you use it up.
 
 ![Anger levels 1 to 5](Docs/ArtDirection/anger.png)
 
