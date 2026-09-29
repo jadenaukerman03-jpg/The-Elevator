@@ -95,7 +95,8 @@ namespace TheElevator.Office
                 for (int i = 1; i < centers.Count; i++) if (distance[r.Id][centers[i]] < distance[r.Id][centers[department]]) department = i;
                 plan.Rooms.Add(new OfficeRoomPlan { RoomId = r.Id, Department = department, Kind = OfficeRoomKind.Workroom, Clearance = r.Id == plan.TargetRoom ? 2 : 0 });
             }
-            plan.DeskBadge=(unchecked((uint)map.Recipe.Seed)%2)==0;
+            // The access card is always carried by an employee (the supervisor), never left on a desk.
+            plan.DeskBadge=false;
             List<OfficeRoomPlan> eventRooms=plan.Rooms.FindAll(r=>r.RoomId>2&&r.RoomId!=plan.TargetRoom&&!map.Rooms[r.RoomId].IsStair&&map.Rooms[r.RoomId].Layer==0);
             ChooseMeetingRoom(map,plan,eventRooms,random);
             BuildZones(map,plan,random);

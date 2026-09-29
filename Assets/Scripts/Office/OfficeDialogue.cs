@@ -110,10 +110,15 @@ namespace TheElevator.Office
         // Seeing the player again while on edge.
         public static readonly string[] Spotted = { "You again.", "Oh, look who's back.", "Don't even think about it.", "I've got my eye on you.", "Keep walking." };
         // Snapped (20+): drawing a weapon, swinging, shooting, and taking a hit.
-        public static readonly string[] DrawRifle = { "That's it! I've had it!", "You want to mess with me? Fine!", "I keep this in my desk for emergencies!", "Consider this your exit interview!" };
+        public static readonly string[] DrawPistol = { "That's it! I've had it!", "You want to mess with me? Fine!", "I keep this in my desk for emergencies!", "Consider this your exit interview!" };
         public static readonly string[] DrawBazooka = { "Time for a little restructuring!", "Say goodbye to your career!", "I've been saving this for a special occasion!" };
         public static readonly string[] Swing = { "Take that!", "How do you like that?", "Hold still!", "This is for my coffee!", "Get over here!", "Come on, then!" };
         public static readonly string[] Firing = { "Stay still!", "You can't run forever!", "I'll get you!", "This is what happens!", "Nowhere to hide!" };
+        // Bystanders who see someone pull a weapon.
+        public static readonly string[] Gasps = { "Gasp!", "Oh no!", "Is that a gun?!", "Everybody get down!", "Oh my gosh!", "What are you doing?!", "Somebody call security!", "Not again!" };
+        public static readonly string[] GaspsBazooka = { "Is that a bazooka?!", "Where did that even come from?!", "Oh no, oh no, oh no!", "Everybody run!" };
+        // The whole building has had enough.
+        public static readonly string[] Riot = { "That's it! Everybody get them!", "We've all had enough of you!", "Get out of our office!", "Somebody grab them!", "You're not getting away this time!" };
         public static readonly string[] Hurt = { "Ow!", "Ouch!", "Hey! That hurt!", "Ugh!", "Oof!" };
 
         static Tier Clamp(Tier tier, string[][] lines) { return (Tier)System.Math.Min((int)tier, lines.Length - 1); }

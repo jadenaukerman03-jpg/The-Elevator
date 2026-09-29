@@ -2,40 +2,40 @@ using System.Collections.Generic;
 using UnityEngine;
 namespace TheElevator.Office
 {
-    public enum Arms { None, Rifle, Bazooka }
+    public enum Arms { None, Pistol, Bazooka }
 
-    // Two employees on every floor keep an assault rifle in their desk and one keeps a bazooka. In an employee's
-    // hands the rifle does 10 a round and misses a lot, so the player can get away; a rocket's 10 m blast does up
-    // to 90 and hurts anyone caught in it, employees included. Knock an armed employee out and they drop it: in a
-    // player's hands every rifle round and every rocket blast is lethal.
+    // Two employees on every floor keep a pistol in their desk and one keeps a bazooka. An employee with a pistol
+    // waits until they have had the player in sight for two seconds, then fires once a second (24 a round, and they
+    // miss a lot) and reloads after six. A rocket's 10 m blast does up to 90 and hurts anyone caught in it,
+    // employees included. Knock an armed employee out and they drop it: in a player's hands every pistol round and
+    // every rocket blast is lethal.
     public static class OfficeWeapons
     {
-        public const float RifleDamage = 10, PunchDamage = 5, BlastRadius = 10, BlastDamage = 90, RocketSpeed = 15;
+        public const float PistolDamage = 24, PunchDamage = 5, BlastRadius = 10, BlastDamage = 90, RocketSpeed = 15;
         // Weapons in a player's hands: one shot, one knockout.
-        public const float PlayerRifleDamage = 1000, PlayerBlastDamage = 1000;
-        public const int RifleMagazine = 30, BazookaRockets = 3;
+        public const float PlayerPistolDamage = 1000, PlayerBlastDamage = 1000;
+        public const int PistolMagazine = 12, BazookaRockets = 3;
+        // An employee's pistol: two seconds of aiming at a player in sight, one shot a second, six to a clip.
+        public const float AimDelay = 2, PistolInterval = 1, ReloadTime = 2.5f;
+        public const int PistolClip = 6;
         const int Mask = ~((1 << 2) | (1 << 8));
         // Counters for checks and tuning.
         public static int Shots, Explosions, Swings;
         static readonly Dictionary<Color, Material> glows = new Dictionary<Color, Material>();
-        static AudioClip rifleShot, rocketLaunch, explosion, punch;
+        static AudioClip pistolShot, rocketLaunch, explosion, punch;
 
         // ---- Models: local +Z is the muzzle direction, the grip sits at the origin ----
         public static Transform Build(Arms arms, OfficeArt a, Transform parent)
         {
-            Transform root = a.Group(parent, arms == Arms.Rifle ? "Assault rifle" : "Bazooka", Vector3.zero);
-            if (arms == Arms.Rifle)
+            Transform root = a.Group(parent, arms == Arms.Pistol ? "Pistol" : "Bazooka", Vector3.zero);
+            if (arms == Arms.Pistol)
             {
-                a.Box(root, "Rifle stock", new Vector3(0, -.01f, -.26f), new Vector3(.045f, .09f, .22f), a.Wood);
-                a.Box(root, "Rifle receiver", new Vector3(0, .02f, .06f), new Vector3(.055f, .08f, .36f), a.Dark);
-                a.Box(root, "Rifle handguard", new Vector3(0, .015f, .32f), new Vector3(.05f, .06f, .18f), a.Wood);
-                GameObject barrel = a.Round(root, "Rifle barrel", new Vector3(0, .03f, .5f), new Vector3(.022f, .12f, .022f), a.Dark);
-                barrel.transform.localRotation = Quaternion.Euler(90, 0, 0);
-                GameObject magazine = a.Box(root, "Curved magazine", new Vector3(0, -.09f, .12f), new Vector3(.035f, .16f, .06f), a.Dark);
-                magazine.transform.localRotation = Quaternion.Euler(-18, 0, 0);
-                a.Box(root, "Pistol grip", new Vector3(0, -.06f, -.04f), new Vector3(.035f, .09f, .045f), a.Wood).transform.localRotation = Quaternion.Euler(-15, 0, 0);
-                a.Box(root, "Front sight", new Vector3(0, .07f, .56f), new Vector3(.01f, .04f, .01f), a.Dark);
-                a.Group(root, "Muzzle", new Vector3(0, .03f, .63f));
+                a.Box(root, "Pistol slide", new Vector3(0, .045f, .06f), new Vector3(.034f, .045f, .2f), a.Dark);
+                a.Box(root, "Pistol frame", new Vector3(0, .015f, .05f), new Vector3(.03f, .03f, .16f), a.Metal);
+                a.Box(root, "Pistol grip", new Vector3(0, -.035f, -.015f), new Vector3(.03f, .1f, .045f), a.Dark).transform.localRotation = Quaternion.Euler(-14, 0, 0);
+                a.Box(root, "Trigger guard", new Vector3(0, -.01f, .035f), new Vector3(.008f, .03f, .045f), a.Dark);
+                a.Box(root, "Front sight", new Vector3(0, .072f, .15f), new Vector3(.006f, .012f, .01f), a.Dark);
+                a.Group(root, "Muzzle", new Vector3(0, .045f, .17f));
             }
             else
             {
@@ -53,21 +53,21 @@ namespace TheElevator.Office
 
         public static Transform Muzzle(Transform weapon) { return weapon ? weapon.Find("Muzzle") : null; }
 
-        // ---- Rifle: one round, with a wide random spread that grows with distance ----
-        public static bool FireRifle(Vector3 muzzle, Vector3 target, WorkerController player, System.Random random)
+        // ---- An employee's pistol: one round, with a wide random spread that grows with distance ----
+        public static bool FirePistol(Vector3 muzzle, Vector3 target, WorkerController player, System.Random random)
         {
-            bool struck = RifleRound(muzzle, target, player.transform.position, player.MotionSpeed, random, out Vector3 direction, out float along) && !player.Down;
+            bool struck = PistolRound(muzzle, target, player.transform.position, player.MotionSpeed, random, out Vector3 direction, out float along) && !player.Down;
             Shots++;
             Flash(muzzle, .14f, .06f, new Color(1f, .85f, .4f));
             Tracer(muzzle, muzzle + direction * along, new Color(1f, .9f, .5f));
-            Play(Clip(ref rifleShot, 0), muzzle, .9f);
-            if (struck) player.Damage(RifleDamage, muzzle, 3);
+            Play(Clip(ref pistolShot, 0), muzzle, .9f);
+            if (struck) player.Damage(PistolDamage, muzzle, 3);
             return struck;
         }
 
         // Where one round goes: a random direction inside a cone that widens with distance (and when the target
         // is moving). Returns whether it hits the body standing at feet before any wall.
-        public static bool RifleRound(Vector3 muzzle, Vector3 target, Vector3 feet, float targetSpeed, System.Random random, out Vector3 direction, out float along)
+        public static bool PistolRound(Vector3 muzzle, Vector3 target, Vector3 feet, float targetSpeed, System.Random random, out Vector3 direction, out float along)
         {
             float distance = Vector3.Distance(muzzle, target);
             float spread = 9 + distance * .55f + (targetSpeed > 1 ? 4 : 0);
@@ -78,8 +78,8 @@ namespace TheElevator.Office
             return false;
         }
 
-        // ---- A player's rifle: along the crosshair with a hair of spread; anything it hits is out ----
-        public static void FirePlayerRifle(OfficeFloor office, WorkerController shooter, Vector3 muzzle, System.Random random)
+        // ---- A player's pistol: along the crosshair with a hair of spread; anything it hits is out ----
+        public static void FirePlayerPistol(OfficeFloor office, WorkerController shooter, Vector3 muzzle, System.Random random)
         {
             Transform view = shooter.View.transform;
             Vector3 direction = Scatter(view.forward, .6f, random);
@@ -99,9 +99,9 @@ namespace TheElevator.Office
             Shots++;
             Flash(muzzle, .16f, .06f, new Color(1f, .85f, .4f));
             Tracer(muzzle, view.position + direction * along, new Color(1f, .9f, .5f));
-            Play(Clip(ref rifleShot, 0), muzzle, 1);
-            if (struck is OfficeEmployee e) e.Damage(PlayerRifleDamage, view.position, 3);
-            else if (struck is WorkerController w) w.Damage(PlayerRifleDamage, view.position, 3);
+            Play(Clip(ref pistolShot, 0), muzzle, 1);
+            if (struck is OfficeEmployee e) e.Damage(PlayerPistolDamage, view.position, 3);
+            else if (struck is WorkerController w) w.Damage(PlayerPistolDamage, view.position, 3);
         }
 
         // ---- Bazooka ----
@@ -243,7 +243,7 @@ namespace TheElevator.Office
                 else data[i] = (Mathf.Sin(t * 2 * Mathf.PI * 120) * .7f + low * .5f) * Mathf.Exp(-t * 40);
                 data[i] = Mathf.Clamp(data[i], -1, 1);
             }
-            cache = AudioClip.Create(kind == 0 ? "Rifle shot" : kind == 1 ? "Rocket launch" : kind == 2 ? "Explosion" : "Punch", data.Length, 1, rate, false);
+            cache = AudioClip.Create(kind == 0 ? "Pistol shot" : kind == 1 ? "Rocket launch" : kind == 2 ? "Explosion" : "Punch", data.Length, 1, rate, false);
             cache.SetData(data, 0);
             return cache;
         }

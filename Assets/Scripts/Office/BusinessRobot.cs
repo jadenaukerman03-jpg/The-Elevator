@@ -25,6 +25,7 @@ namespace TheElevator.Office
         public Vector3 LookTarget;
         public Vector3 PointAt;
         public int Mood=1;
+        public bool Crazed;
         public void HoldPointer()
         {
             if(!rig)return;
@@ -57,7 +58,7 @@ namespace TheElevator.Office
             bool work=Speed<.15f;
             bool desk=work&&(Activity==OfficeTask.Typing||Activity==OfficeTask.Reception),coffee=work&&Activity==OfficeTask.Coffee;
             bool pointing=work&&Activity==OfficeTask.Present&&PointAt!=Vector3.zero;
-            rig.SetMood(Mood);
+            rig.SetMood(Mood);rig.SetCrazed(Crazed);
             rig.Animate(dt,new BeanPose{
                 Speed=Speed,Seated=Seated,Talking=Talking,Typing=work&&Activity==OfficeTask.Typing,
                 Reaching=Reaching||pointing,ReachTarget=pointing?PointAt:ReachTarget,LookTarget=LookTarget,

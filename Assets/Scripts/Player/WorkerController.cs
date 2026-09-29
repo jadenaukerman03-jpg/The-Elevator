@@ -47,6 +47,14 @@ namespace TheElevator
         public Vector3 BodyPosition { get { return Model && Model.Core ? Model.Core.position : transform.position; } }
         WorkerController bodyTarget;
         float hurtFlash;
+        static Texture2D bloodEdge;
+        // Red at the edges of the screen, like blood: a flash with every hit that fades, and a steady rim below 25% health.
+        public float BloodEdge { get { return Mathf.Max(Health < MaxHealth * .25f ? .8f : 0, Mathf.Clamp01(hurtFlash) * .7f); } }
+        // A short cutscene: the view turns to a face and zooms in (someone nearby pulling a weapon).
+        Transform cutFocus;
+        float cutUntil;
+        public bool InCutscene { get { return cutFocus && Time.time < cutUntil; } }
+        public void Cutscene(Transform focus, float seconds) { cutFocus = focus; cutUntil = Time.time + seconds; }
         static Texture2D foamBlot;
         // Seated view: a little lower than standing, so sitting reads as sitting.
         public const float SeatedEyeHeight=1.22f;
@@ -120,6 +128,7 @@ namespace TheElevator
             if(ReadingNotebook||Down)return;
             damageCooldown -= Time.deltaTime;
             FaceFoam = Mathf.MoveTowards(FaceFoam, 0, Time.deltaTime / 7f);
+            if (InCutscene) { Motion = Vector3.zero; Model.Animate(0, Held, Time.deltaTime); return; }
             yaw += Input.GetAxisRaw("Mouse X") * 2.1f;
             pitch = Mathf.Clamp(pitch - Input.GetAxisRaw("Mouse Y") * 1.8f, -65, 75);
             if (Seat) { UpdateSeated(); return; }
@@ -135,6 +144,7 @@ namespace TheElevator
             Vector3 direction = Quaternion.Euler(0, yaw, 0) * input;
             FireExtinguisher extinguisher = Held ? Held.GetComponent<FireExtinguisher>() : null;
             TheElevator.Office.PlayerWeapon weapon = Held ? Held.GetComponent<TheElevator.Office.PlayerWeapon>() : null;
+            FirstAidKit kit = Held ? Held.GetComponent<FirstAidKit>() : null;
             SetCrouched(Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C));
             MovingFast = !Crouched && Input.GetKey(KeyCode.LeftShift) && Stamina > 0.08f && input.sqrMagnitude > 0.1f;
             Stamina = infiniteStamina ? 1f : Mathf.Clamp01(Stamina + Time.deltaTime * (MovingFast ? -0.23f : 0.17f));
@@ -169,7 +179,7 @@ namespace TheElevator
             }
             UpdateTarget();
             // With a usable item in hand the mouse button uses it; E still interacts.
-            if (Input.GetKeyDown(KeyCode.E) || (CanInteract && !extinguisher && !weapon && Input.GetMouseButtonDown(0)))
+            if (Input.GetKeyDown(KeyCode.E) || (CanInteract && !extinguisher && !weapon && !kit && Input.GetMouseButtonDown(0)))
             {
                 if(elevatorButton){elevatorButton.Press();}
                 else if(notebook){notebook.Open();}
@@ -189,6 +199,8 @@ namespace TheElevator
             if (extinguisher) extinguisher.Operate(this, !ChargingThrow && Input.GetMouseButton(0), Time.deltaTime);
             weapon = Held ? Held.GetComponent<TheElevator.Office.PlayerWeapon>() : null;
             if (weapon) weapon.Operate(this, !ChargingThrow && Input.GetMouseButton(0), !ChargingThrow && Input.GetMouseButtonDown(0));
+            kit = Held ? Held.GetComponent<FirstAidKit>() : null;
+            if (kit && !ChargingThrow && Input.GetMouseButtonDown(0)) kit.Use(this);
 
             if (transform.position.y < -8) game.Finish(false, "The facility has no basement for this basement.");
         }
@@ -302,6 +314,51 @@ namespace TheElevator
         }
 
         public void Foam(float amount) { FaceFoam = Mathf.Clamp01(FaceFoam + amount); }
+        public void Heal(float amount) { if (!Down) Health = Mathf.Min(MaxHealth, Health + amount); }
+
+        void DrawBloodEdge()
+        {
+            float strength = BloodEdge;
+            if (strength <= .01f || Event.current.type != EventType.Repaint) return;
+            if (!bloodEdge) bloodEdge = BloodTexture();
+            // A slow pulse while badly hurt.
+            float pulse = Health < MaxHealth * .25f ? 1 + Mathf.Sin(Time.time * 3.2f) * .08f : 1;
+            Color old = GUI.color;
+            GUI.color = new Color(1, 1, 1, Mathf.Clamp01(strength * pulse));
+            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), bloodEdge);
+            GUI.color = old;
+        }
+
+        // Dark red that creeps in from the edges in uneven, soft blotches (not a clean even ring).
+        static Texture2D BloodTexture()
+        {
+            const int size = 256;
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false) { name = "Blood edge", wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.DontSave };
+            Color[] pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (size - 1f) * 2 - 1, v = y / (size - 1f) * 2 - 1;
+                    float edge = Mathf.Max(Mathf.Abs(u), Mathf.Abs(v)) * .55f + new Vector2(u, v).magnitude * .45f;
+                    float n = Noise(u * 3.1f, v * 3.1f) * .55f + Noise(u * 7.3f + 11, v * 7.3f + 5) * .3f + Noise(u * 15f + 3, v * 15f + 17) * .15f;
+                    float amount = Mathf.SmoothStep(0, 1, Mathf.InverseLerp(.78f, 1.12f, edge + (n - .5f) * .34f));
+                    float shade = .6f + n * .4f;
+                    pixels[y * size + x] = new Color(.5f * shade, .02f, .03f, amount * .85f);
+                }
+            texture.SetPixels(pixels); texture.Apply();
+            return texture;
+        }
+
+        // Smooth value noise in 0..1.
+        static float Noise(float x, float y)
+        {
+            int ix = Mathf.FloorToInt(x), iy = Mathf.FloorToInt(y);
+            float fx = x - ix, fy = y - iy;
+            fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+            float a = Hash(ix, iy), b = Hash(ix + 1, iy), c = Hash(ix, iy + 1), d = Hash(ix + 1, iy + 1);
+            return Mathf.Lerp(Mathf.Lerp(a, b, fx), Mathf.Lerp(c, d, fx), fy);
+        }
+        static float Hash(int x, int y) { unchecked { int h = x * 374761393 + y * 668265263; h = (h ^ (h >> 13)) * 1274126177; return ((h ^ (h >> 16)) & 0xffff) / 65535f; } }
 
         // Punches, bullets and blasts. The lift is safe: nothing hurts you inside it.
         public void Damage(float amount, Vector3 from, float knock)
@@ -455,12 +512,7 @@ namespace TheElevator
         {
             if(!game||!game.ControlsActive||ReadingNotebook||PreviewAvatar)return;
             DrawFaceFoam();
-            if(hurtFlash>.01f&&Event.current.type==EventType.Repaint)
-            {
-                // A red flash when you get hurt.
-                Color old=GUI.color;GUI.color=new Color(.85f,.05f,.05f,hurtFlash*.45f);
-                GUI.DrawTexture(new Rect(0,0,Screen.width,Screen.height),Texture2D.whiteTexture);GUI.color=old;
-            }
+            DrawBloodEdge();
             if(!Held)return;
             // Throw strength and item usage share one ring around the cursor.
             if(ChargingThrow){CursorGauge.Draw(ThrowCharge,Color.Lerp(new Color(1,.85f,.3f),new Color(1,.3f,.12f),ThrowCharge));return;}
@@ -500,7 +552,7 @@ namespace TheElevator
             flashlight.enabled = flashlightOn;
             View.rect = new Rect(0, 0, 1, 1);
             if (game.Paused) return;
-            hurtFlash = Mathf.MoveTowards(hurtFlash, 0, Time.deltaTime * 1.2f);
+            hurtFlash = Mathf.MoveTowards(hurtFlash, 0, Time.deltaTime * .8f);
             if (Down)
             {
                 // Out cold: watch a teammate who is still on their feet over their shoulder.
@@ -538,6 +590,17 @@ namespace TheElevator
                     distance = Mathf.Max(0.12f, hit.distance - 0.08f);
                 position += back * distance;
             }
+            if (InCutscene && firstPerson)
+            {
+                Vector3 face = cutFocus.TransformPoint(BeanRig.HeadCenter);
+                rotation = Quaternion.Slerp(View.transform.rotation, Quaternion.LookRotation(face - position), 1 - Mathf.Exp(-5 * Time.deltaTime));
+                // Keep the look angles in step, so control resumes from here with no snap.
+                Vector3 f = rotation * Vector3.forward;
+                yaw = Mathf.Atan2(f.x, f.z) * Mathf.Rad2Deg;
+                pitch = Mathf.Clamp(-Mathf.Asin(Mathf.Clamp(f.y, -1, 1)) * Mathf.Rad2Deg, -65, 75);
+                transform.rotation = Quaternion.Euler(0, yaw, 0);
+            }
+            View.fieldOfView = Mathf.MoveTowards(View.fieldOfView, InCutscene ? 34 : 60, Time.deltaTime * 45);
             View.transform.SetPositionAndRotation(position, rotation);
             FireExtinguisher held = Held ? Held.GetComponent<FireExtinguisher>() : null;
             if (held && Held.IsHeld) held.PoseHeld(View.transform);

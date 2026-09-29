@@ -36,12 +36,74 @@ namespace TheElevator.Office
                 }
             }
         }
-        // Every floor has exactly three armed employees: two keep a rifle in their desk, one a bazooka.
+        // ---- Building-wide anger ----
+        // Every point of anger any offence adds (a bump is 1, a thrown item 5) fills a meter for the whole
+        // building. It never goes down. Full at 50: everyone in the building turns on the players, for good.
+        public const float RiotPoint=50;
+        public float BuildingAnger{get;private set;}
+        public bool Riot{get{return BuildingAnger>=RiotPoint;}}
+        public void AddAnger(float amount)
+        {
+            if(Riot||amount<=0)return;
+            BuildingAnger=Mathf.Min(RiotPoint,BuildingAnger+amount);
+            if(!Riot)return;
+            if(Game)Game.Notify("The whole office has had enough of you.");
+            foreach(OfficeEmployee employee in Employees)
+                employee.JoinRiot(Game&&Vector3.Distance(employee.transform.position,Game.Player.transform.position)<20);
+        }
+        // Test hook: set the meter below the riot point (checks run many offences in a row).
+        public void SetAngerForValidation(float value){if(!Riot)BuildingAnger=Mathf.Clamp(value,0,RiotPoint-.01f);}
+        // With the whole building hunting at once, only a few chase routes are planned each frame.
+        int planFrame,plansThisFrame;
+        public bool TryPlanChase()
+        {
+            if(Time.frameCount!=planFrame){planFrame=Time.frameCount;plansThisFrame=0;}
+            if(plansThisFrame>=6)return false;
+            plansThisFrame++;return true;
+        }
+        // Someone pulls a weapon: everyone who can see it gasps, and any player standing close gets a look at their face.
+        public int Gasps{get;private set;}
+        public void WeaponDrawn(OfficeEmployee armed)
+        {
+            Vector3 chest=armed.transform.position+Vector3.up*1.1f;
+            foreach(OfficeEmployee other in Employees)
+            {
+                if(other==armed||other.Dead)continue;
+                Vector3 eye=other.transform.position+Vector3.up*1.34f;
+                if(Vector3.Distance(eye,chest)>14||Physics.Linecast(eye,chest,~((1<<2)|(1<<8)),QueryTriggerInteraction.Ignore))continue;
+                other.Gasp(armed.Weapon==Arms.Bazooka);Gasps++;
+            }
+            if(!Game)return;
+            foreach(WorkerController member in Game.Crew)
+            {
+                if(member.Down||member.Remote)continue;
+                Vector3 eye=member.View.transform.position;
+                if(Vector3.Distance(eye,chest)<10&&!Physics.Linecast(eye,chest,~((1<<2)|(1<<8)),QueryTriggerInteraction.Ignore)&&armed.Robot.Head)
+                    member.Cutscene(armed.Robot.Head,OfficeEmployee.DrawTime);
+            }
+        }
+
+        // ---- The access card: always carried by one employee ----
+        // The supervisor has it. Lift it from behind (hold G), or knock them out and pick it up off the floor.
+        public OfficeEmployee KeycardHolder{get{return Employees.Count>0&&Employees[0].Supervisor?Employees[0]:null;}}
+        public void DropKeycard(Vector3 at,Quaternion rotation)
+        {
+            Transform card=Kit.A.Group(transform,"DROPPED SUPERVISOR KEYCARD",transform.InverseTransformPoint(at));
+            card.rotation=rotation;
+            Kit.A.Box(card,"Bright clearance card",Vector3.zero,new Vector3(.29f,.025f,.19f),Kit.A.WarmLight);
+            Kit.A.Box(card,"Supervisor stripe",new Vector3(0,.018f,.048f),new Vector3(.25f,.005f,.045f),Kit.A.Red);
+            Kit.A.Box(card,"Badge clip",new Vector3(0,.02f,.11f),new Vector3(.08f,.015f,.04f),Kit.A.Brass);
+            BoxCollider collider=card.gameObject.AddComponent<BoxCollider>();collider.size=new Vector3(.31f,.08f,.23f);
+            DeskKeycard=card.gameObject.AddComponent<OfficeKeycard>();DeskKeycard.Office=this;
+            TextMesh print=Kit.A.W.Label("ACCESS / 02",card,new Vector3(0,.016f,-.018f),.006f,Color.black);print.transform.localRotation=Quaternion.Euler(90,0,0);
+        }
+
+        // Every floor has exactly three armed employees: two keep a pistol in their desk, one a bazooka.
         void AssignSidearms()
         {
             System.Random dice=new System.Random(unchecked(Map.Manifest.Recipe.Seed*31+7));
             List<OfficeEmployee> pool=new List<OfficeEmployee>(Employees);
-            for(int i=0;i<3&&pool.Count>0;i++){int pick=dice.Next(pool.Count);pool[pick].Sidearm=i<2?Arms.Rifle:Arms.Bazooka;pool.RemoveAt(pick);}
+            for(int i=0;i<3&&pool.Count>0;i++){int pick=dice.Next(pool.Count);pool[pick].Sidearm=i<2?Arms.Pistol:Arms.Bazooka;pool.RemoveAt(pick);}
         }
         void PopulateEmployees(OfficeTaskPoint supervisor)
         {
@@ -59,20 +121,6 @@ namespace TheElevator.Office
                     SpawnEmployee(task,false);capacity--;
                 }
             }
-        }
-        void BuildDeskKeycard(OfficeTaskPoint supervisor)
-        {
-            // A reception spare always provides a discoverable route to the first contract.
-            if(Plan.DeskBadge)Employees[0].HasBadge=false;
-            Vector3 location=supervisor.transform.parent.TransformPoint(new Vector3(.56f,supervisor.Activity==OfficeTask.Reception?1.214f:.823f,.30f));
-            Transform card=Kit.A.Group(transform,"VISIBLE SUPERVISOR KEYCARD",transform.InverseTransformPoint(location));
-            card.rotation=supervisor.transform.rotation;
-            Kit.A.Box(card,"Bright clearance card",Vector3.zero,new Vector3(.29f,.025f,.19f),Kit.A.WarmLight);
-            Kit.A.Box(card,"Supervisor stripe",new Vector3(0,.018f,.048f),new Vector3(.25f,.005f,.045f),Kit.A.Red);
-            Kit.A.Box(card,"Badge clip",new Vector3(0,.02f,.11f),new Vector3(.08f,.015f,.04f),Kit.A.Brass);
-            BoxCollider collider=card.gameObject.AddComponent<BoxCollider>();collider.size=new Vector3(.31f,.08f,.23f);
-            DeskKeycard=card.gameObject.AddComponent<OfficeKeycard>();DeskKeycard.Office=this;
-            TextMesh print=Kit.A.W.Label("ACCESS / 02",card,new Vector3(0,.016f,-.018f),.006f,Color.black);print.transform.localRotation=Quaternion.Euler(90,0,0);
         }
         void MakeComputersStealable()
         {

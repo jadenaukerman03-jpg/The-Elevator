@@ -171,7 +171,8 @@ namespace TheElevator.Office
             else Robot.LookTarget=Vector3.zero;
             Robot.Talking=Office.IsMeetingSpeaker(this)||PhraseShowing;
             if(Robot.Activity==OfficeTask.Present)Robot.PointAt=Office.BoardPoint(Time.time);
-            Robot.Mood=AngerLevel;
+            // Pulling a weapon, the anger drains from the face for a moment: pale, wide-eyed, grinning.
+            Robot.Mood=Drawing?1:AngerLevel;
             Robot.Speed=Vector3.Distance(transform.position,previous)/Mathf.Max(.001f,Time.deltaTime);previous=transform.position;
             if(Cup&&CoffeeStage<0){Cup.transform.position=transform.position+transform.forward*.36f+transform.right*.23f+Vector3.up*1.10f;Cup.transform.rotation=Quaternion.identity;Robot.Reaching=true;Robot.ReachTarget=Cup.transform.position+Vector3.up*.07f;}
             Robot.Animate(Time.deltaTime);

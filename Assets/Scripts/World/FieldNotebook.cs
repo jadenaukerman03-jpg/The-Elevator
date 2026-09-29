@@ -5,7 +5,7 @@ namespace TheElevator
     {
         DescentGame game; TextMesh page; int index; Vector3 home;Quaternion homeRotation; bool reading; int openedFrame;
         readonly string[] pages={
-            "FIELD GUIDE / 01\n\nMORROW SYSTEMS\n\nFind the bright access card\non the reception counter.\nUse it at the secured room.\nBring the contract asset\nfully inside the lift.",
+            "FIELD GUIDE / 01\n\nMORROW SYSTEMS\n\nOne employee carries the\naccess card. Lift it from\nbehind (hold G) or knock\nthem out and pick it up.\nUse it on the locked door.\nBring the asset behind it\nfully inside the lift.",
             "FIELD GUIDE / 02\n\nWASD: move   SHIFT: run\nCTRL / C: crouch\nE or click: interact\nE: put down a held item\nHold Q: charge a throw\nRelease Q: throw\nL: flashlight",
             "FIELD GUIDE / 03\n\nLook directly at a number\non the right-hand panel.\nGreen means available.\nAmber means this floor.\nGrey means locked.\nComplete this contract to\nunlock the next floor.\nFloor 0 is reserved for the hub.",
             "FIELD GUIDE / 04\n\nEmployees notice theft.\nAn occupied computer draws\nextra attention. Keep quiet.\n\nF connects a held battery\ninside the lift.\n\nClick the page edges to turn.\nE closes this notebook."};

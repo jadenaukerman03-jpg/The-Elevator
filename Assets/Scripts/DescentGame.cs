@@ -103,7 +103,7 @@ namespace TheElevator
             if (Phase != RunPhase.Briefing) return;
             Phase = RunPhase.Exploring;
             SetCursor(true);
-            Notify(CurrentOffice ? "Morrow Systems. The access card is on the reception counter. Read the field notebook in the lift." : "Collect valuables. Bring a power cell back and press F to connect it.");
+            Notify(CurrentOffice ? "Morrow Systems. One employee carries the access card. Read the field notebook in the lift." : "Collect valuables. Bring a power cell back and press F to connect it.");
             Sound.Play(660, 0.22f, 0.13f);
         }
 

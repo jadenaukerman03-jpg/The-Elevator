@@ -21,7 +21,7 @@ namespace TheElevator.Editor
     var office=game.CurrentOffice;
     if(stage==0){
      Check(!game.UseManualSeed,"Player launch randomizes the seed");seed=game.ActiveSeed;hash=game.CurrentMap.Manifest.StructureHash;game.Begin();
-     Check(office.DeskKeycard,"Reception access card is always present");
+     Check(office.KeycardHolder&&office.KeycardHolder.HasBadge&&!office.DeskKeycard,"One employee carries the access card");
      var buttons=game.GetComponentsInChildren<ElevatorButton>();Check(buttons.Length==51&&buttons.Select(b=>b.Number).Distinct().Count()==51,"All 51 distinct buttons exist");
      Check(game.HighestUnlocked==1&&!game.CanSelectFloor(0)&&!game.CanSelectFloor(2)&&!game.CanSelectFloor(50),"Only level one initially unlocked; hub reserved");
      foreach(var button in buttons){Vector3 start=button.transform.position-button.transform.forward*.45f;Check(Physics.Raycast(start,button.transform.forward,out RaycastHit hit,.6f)&&hit.collider.GetComponent<ElevatorButton>()==button,"Exact ray reaches button "+button.Number);}
@@ -41,8 +41,9 @@ namespace TheElevator.Editor
      foreach(MeshFilter model in game.Player.Hands.GetComponentsInChildren<MeshFilter>(true))foreach(Vector3 v in model.sharedMesh.vertices)Check(!float.IsNaN(v.x)&&!float.IsNaN(v.y)&&!float.IsNaN(v.z),"Finite hand geometry");
      game.Player.Hands.gameObject.SetActive(true);OfficeTools.Capture(game.transform,"TestResults/Office/hands-idle.png",game.Player.View.transform.position,game.Player.View.transform.position+game.Player.View.transform.forward);
      var book=game.GetComponentInChildren<FieldNotebook>();book.Open();book.SendMessage("LateUpdate");OfficeTools.Capture(game.transform,"TestResults/Office/notebook-reading.png",game.Player.View.transform.position,game.Player.View.transform.position+game.Player.View.transform.forward);book.Close();
+     office.KeycardHolder.Damage(1000,office.KeycardHolder.transform.position+Vector3.forward,0);Check(office.DeskKeycard,"The access card drops when its holder is knocked out");
      var card=office.DeskKeycard;OfficeTools.Capture(game.transform,"TestResults/Office/reception-keycard.png",card.transform.position+Vector3.up*.6f-card.transform.forward*.65f,card.transform.position);
-     card.Take();Check(office.BadgeLevel>=2,"Reception card grants access");
+     card.Take();Check(office.BadgeLevel>=2,"The dropped access card grants access");
      office.Objective.transform.position=new Vector3(0,1.1f,-6);Physics.SyncTransforms();Check(office.RequiredRecovered,"Contract asset fits redesigned cabin");Check(game.CanSelectFloor(2)&&game.HighestUnlocked==2&&!game.CanSelectFloor(3),"Completion unlocks exactly the next floor");
      game.SelectFloor(2);Check(game.Phase==DescentGame.RunPhase.Closing,"Unlocked button starts departure");stage=2;return;
     }

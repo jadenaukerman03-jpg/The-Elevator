@@ -295,8 +295,8 @@ namespace TheElevator
             if (level > 1 && !moodBrows[level]) BuildMood(level);
             for (int i = 2; i <= 5; i++) { if (moodBrows[i]) moodBrows[i].SetActive(i == level); if (moodMouths[i]) moodMouths[i].SetActive(i == level); }
             foreach (GameObject brow in baseBrows) brow.SetActive(level == 1);
-            headRenderer.sharedMaterial = Paint(Color.Lerp(Look.Skin, AngerRed, MoodFlush[level]));
             mood = level;
+            PaintHead();
         }
 
         void BuildMood(int level)
@@ -403,15 +403,18 @@ namespace TheElevator
             // The head steadies against the hips' twist so the face stays pointed where the body is going.
             head.localRotation = Quaternion.Euler(-lean * .5f, -twist * .8f, 0) * gaze * Quaternion.Euler(bob.x + Mathf.Sin(phase * 2) * walk * 1.5f, 0, bob.y + breathe * .6f);
 
-            float blink = (clock + identity * .71f) % 4.3f < .11f ? .12f : 1;
-            float squint = MoodSquint[mood];
-            for (int i = 0; i < blinkers.Count; i++) { Vector3 scale = blinkScales[i]; blinkers[i].localScale = new Vector3(scale.x, scale.y * blink * squint, scale.z); }
+            // Crazed: an unblinking, wide-eyed stare.
+            float blink = crazed ? 1 : (clock + identity * .71f) % 4.3f < .11f ? .12f : 1;
+            float squint = crazed ? 1.5f : MoodSquint[mood];
+            for (int i = 0; i < blinkers.Count; i++) { Vector3 scale = blinkScales[i]; blinkers[i].localScale = new Vector3(scale.x * (crazed ? 1.25f : 1), scale.y * blink * squint, scale.z); }
             foreach (GameObject shine in shines) shine.SetActive(blink == 1);
-            bool open = pose.Talking && pace < .15f && Mathf.Sin(clock * 17 + identity) > 0;
+            bool open = crazed || (pose.Talking && pace < .15f && Mathf.Sin(clock * 17 + identity) > 0);
             mouthClosed.SetActive(!open && mood == 1); mouthOpen.SetActive(open);
             if (moodMouths[mood]) moodMouths[mood].SetActive(!open);
             // Fury shakes the head.
             if (mood == 5) head.localRotation *= Quaternion.Euler(0, Mathf.Sin(clock * 38) * 2.5f, Mathf.Sin(clock * 31) * 1.5f);
+            // Crazed: small jerky twitches and a tilted head.
+            if (crazed) head.localRotation *= Quaternion.Euler(Mathf.Sin(clock * 23) * 3, Mathf.Sin(clock * 17) * 4, 12 + Mathf.Sin(clock * 29) * 5);
         }
 
         // swing: +1 leg back, -1 leg forward. The knee folds while the leg travels forward; the toe rolls off behind.
@@ -575,6 +578,22 @@ namespace TheElevator
         }
 
         // Shared across all characters so identical colors batch; kept for the whole session.
+        // Crazed (pulling a weapon): the face drains to an extreme pallor with a wild stare.
+        bool crazed;
+        public void SetCrazed(bool on)
+        {
+            if (crazed == on || !headRenderer) return;
+            crazed = on;
+            PaintHead();
+        }
+
+        // Head colour: extreme pallor while crazed, otherwise skin flushed by anger.
+        void PaintHead()
+        {
+            if (!headRenderer) return;
+            headRenderer.sharedMaterial = Paint(crazed ? Color.Lerp(Look.Skin, new Color(.95f, .95f, .91f), .88f) : Color.Lerp(Look.Skin, AngerRed, MoodFlush[mood]));
+        }
+
         public static Material Paint(Color color)
         {
             if (paints.TryGetValue(color, out Material material) && material) return material;

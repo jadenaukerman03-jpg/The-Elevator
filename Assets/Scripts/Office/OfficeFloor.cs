@@ -43,7 +43,6 @@ namespace TheElevator.Office
             if(!supervisor)throw new InvalidOperationException("Credential holder has no usable workstation.");
             PrepareWorkplaces();
             PopulateEmployees(supervisor);AssignSidearms();
-            BuildDeskKeycard(supervisor);
             BuildDoors();
             if(Game)
             {
@@ -129,6 +128,8 @@ namespace TheElevator.Office
         {
             foreach(Transform mount in Kit.ExtinguisherMounts)
                 if(mount)FireExtinguisher.Create(Game,Kit.A,transform,mount.position+Vector3.up*FireExtinguisher.HalfHeight,mount.rotation);
+            foreach(Transform mount in Kit.FirstAidMounts)
+                if(mount)FirstAidKit.Create(Game,Kit.A,transform,mount.position+Vector3.up*FirstAidKit.HalfHeight,mount.rotation);
         }
         // The living employee whose body a point is inside (with some padding), for thrown objects.
         public OfficeEmployee EmployeeAt(Vector3 point,float padding)

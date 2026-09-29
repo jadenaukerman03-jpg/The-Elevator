@@ -26,6 +26,9 @@ namespace TheElevator.Editor
         static WorkerController teammate;
         static OfficeEmployee rocketeer,target;
         static PlayerWeapon playerGun;
+        static OfficeEmployee drawer;
+        static bool earlyShot;
+        static int gaspsBefore;
         static OfficeInteractionValidation(){EditorApplication.update+=Tick;Application.logMessageReceived+=Log;}
         public static void Run()
         {
@@ -83,12 +86,14 @@ namespace TheElevator.Editor
                     // Bumping: one contact raises that one employee's anger by exactly one level.
                     bumped=participants.Find(e=>e.Station&&e.Station.Activity==OfficeTask.Meeting);Check(bumped,"Seated attendee to bump");
                     Vector3 at=bumped.transform.position,from=at-bumped.transform.forward*.6f,toward=(at-from).normalized*4;
+                    float meterStart=office.BuildingAnger;
                     Check(office.CheckBumps(from,toward)==1&&bumped.AngerLevel==2,"A bump raises anger by one level");
                     Check(participants.TrueForAll(e=>e==bumped||e.AngerLevel==1),"Only the bumped employee is upset");
                     Check(office.CheckBumps(from,toward)==0&&bumped.AngerLevel==2,"Staying in contact is one bump, not many");
                     office.CheckBumps(at+Vector3.right*40,Vector3.zero);
                     Check(office.CheckBumps(from,toward)==1&&bumped.AngerLevel==3,"Walking into them again raises another level");
                     Check(office.CheckBumps(from+Vector3.right*40,Vector3.zero)==0,"Separating is not a bump");
+                    Check(Mathf.Approximately(office.BuildingAnger-meterStart,2),"Each bump adds a point to the building's anger meter");
                     var subject=participants[0];OfficeTools.Capture(office.transform,"TestResults/Office/synthetic-face.png",subject.Robot.Head.position+subject.transform.forward*.52f+subject.transform.right*.18f+Vector3.up*.15f,subject.Robot.Head.position+Vector3.up*.15f);
                     // Fire extinguisher: cheap two-handed pickup with twelve seconds of foam.
                     SalvageItem mounted=game.Items.Find(i=>i&&i.GetComponent<FireExtinguisher>()&&i.Body.isKinematic);
@@ -171,6 +176,18 @@ namespace TheElevator.Editor
                 {
                     if(Time.time-started<1f)return;
                     Check(!game.Player.Seat&&seat.Free(office)&&(!seat.Station(office)||!seat.Station(office).ReservedByPlayer),"Player stands back up and frees the seat");
+                    // (The many offences checked below would fill the building meter; keep it under the riot point until the riot check.)
+                    Check(!office.Riot,"No riot yet");office.SetAngerForValidation(0);
+                    // First aid: heals half your health and is used up.
+                    FirstAidKit kit=FirstAidKit.Create(game,office.Kit.A,office.transform,game.Player.transform.position+Vector3.up*1.1f+game.Player.transform.forward*.6f,Quaternion.identity);
+                    SalvageItem kitItem=kit.GetComponent<SalvageItem>();Check(kitItem.Title=="First aid kit"&&kitItem.Body.isKinematic&&Mathf.Approximately(FirstAidKit.SpawnChance,.02f),"First aid kits hang on walls in one room in fifty");
+                    game.Player.HealForValidation();game.Player.Damage(70,game.Player.transform.position+Vector3.forward,0);
+                    Check(Mathf.Approximately(game.Player.Health,30)&&game.Player.BloodEdge>0,"Getting hurt flashes red at the screen edges");
+                    Check(game.Player.PickUp(kitItem),"The player picks up the first aid kit");kit.Use(game.Player);
+                    Check(Mathf.Approximately(game.Player.Health,80)&&!game.Player.Held,"The first aid kit heals half your health and is used up");
+                    game.Player.HealForValidation();game.Player.Damage(80,game.Player.transform.position+Vector3.forward,0);
+                    Check(game.Player.Health<25&&game.Player.BloodEdge>=.8f,"Below 25% health the red edges stay");
+                    game.Player.HealForValidation();Check(game.Player.BloodEdge==0,"Healthy again, the red is gone");
                     // One phrase per bubble.
                     // One phrase per bubble, and one line at a time: a new line waits for the current one to finish.
                     OfficeEmployee quiet=office.Employees.Find(e=>!e.Dead&&!e.Speaking&&!e.Partner);
@@ -203,18 +220,21 @@ namespace TheElevator.Editor
                     brute.LastSawPlayerAgo(300);Check(brute.Snapped,"Snapped employees never cool down");
                     // Rifle fire is deliberately inaccurate.
                     System.Random dice=new System.Random(5);int hits=0;Vector3 feet=new Vector3(0,300,0);
-                    for(int i=0;i<400;i++)if(OfficeWeapons.RifleRound(feet+new Vector3(0,1.3f,-10),feet+Vector3.up*1.1f,feet,0,dice,out Vector3 d,out float a))hits++;
+                    for(int i=0;i<400;i++)if(OfficeWeapons.PistolRound(feet+new Vector3(0,1.3f,-10),feet+Vector3.up*1.1f,feet,0,dice,out Vector3 d,out float a))hits++;
                     Check(hits>5&&hits<120,"An employee's rifle is very inaccurate at 10 m ("+hits+"/400 hits)");
                     // Live: an armed employee shoots at the player, an unarmed one throws punches.
                     rifleman=office.Employees.Find(e=>!e.Dead&&e!=brute&&e!=foamed&&e.HomeRoom==office.Plan.MeetingRoom&&e.Station&&e.Station.Activity==OfficeTask.Meeting);
-                    rifleman.ArmForValidation(Arms.Rifle);Check(rifleman.Weapon==Arms.Rifle&&rifleman.Snapped,"Snapped employees can carry a rifle");
+                    rifleman.ArmForValidation(Arms.Pistol);Check(rifleman.Weapon==Arms.Pistol&&rifleman.Snapped,"Snapped employees can carry a rifle");
                     game.Player.Teleport(brute.transform.position+brute.transform.forward*.9f);game.Player.HealForValidation();
                     shotsBefore=OfficeWeapons.Shots;swingsBefore=OfficeWeapons.Swings;lowestHealth=100;started=Time.time;stage=6;return;
                 }
                 if(stage==6)
                 {
                     lowestHealth=Mathf.Min(lowestHealth,game.Player.Health);game.Player.HealForValidation();
-                    if(Time.time-started<4f)return;
+                    if(Time.time-started<1.8f&&OfficeWeapons.Shots>shotsBefore)earlyShot=true;
+                    if(Time.time-started<4.5f)return;
+                    Check(!earlyShot,"An armed employee aims for two seconds before the first shot");
+                    Check(OfficeWeapons.Shots-shotsBefore<=4,"Then one shot a second ("+(OfficeWeapons.Shots-shotsBefore)+" in 4.5 s)");
                     Check(OfficeWeapons.Shots>shotsBefore,"The armed employee opens fire ("+(OfficeWeapons.Shots-shotsBefore)+" rounds)");
                     Check(OfficeWeapons.Swings>swingsBefore,"The unarmed employee swings at the player ("+(OfficeWeapons.Swings-swingsBefore)+" swings)");
                     Check(lowestHealth<100,"The player gets hurt (lowest health "+lowestHealth+")");
@@ -226,6 +246,19 @@ namespace TheElevator.Editor
                     float bystander=victim.Health;
                     OfficeWeapons.Explode(office,victim.transform.position+Vector3.up*.5f+victim.transform.forward*.8f);
                     Check(victim.Health<bystander,"Employees caught in a blast get hurt");
+                    // Pulling a weapon: pale and wild-eyed for a moment, a close-up for the player, gasps from anyone watching.
+                    Vector3 eye=game.Player.View.transform.position;drawer=null;float nearest=10;
+                    foreach(OfficeEmployee e in office.Employees)
+                    {
+                        if(e.Dead||e==brute||e==rifleman||e==rocketeer||e.Weapon!=Arms.None)continue;
+                        Vector3 chest=e.transform.position+Vector3.up*1.1f;float d=Vector3.Distance(eye,chest);
+                        if(d<nearest&&!Physics.Linecast(eye,chest,~((1<<2)|(1<<8)),QueryTriggerInteraction.Ignore)){nearest=d;drawer=e;}
+                    }
+                    Check(drawer,"Someone close by to draw a weapon");
+                    gaspsBefore=office.Gasps;drawer.DrawForValidation(Arms.Pistol);
+                    Check(drawer.Drawing&&drawer.Robot.Crazed&&drawer.Weapon==Arms.Pistol,"Drawing a weapon, they go pale and wild-eyed");
+                    Check(game.Player.InCutscene,"The player close by gets a look at their face");
+                    Check(office.Gasps>gaspsBefore,"Everyone who sees the weapon gasps ("+(office.Gasps-gaspsBefore)+")");
                     started=Time.time;stage=7;return;
                 }
                 if(stage==7)
@@ -233,6 +266,7 @@ namespace TheElevator.Editor
                     game.Player.HealForValidation();
                     if(Time.time-started<3f)return;
                     Check(OfficeWeapons.Explosions>=blastsBefore+2,"The bazooka rocket explodes");
+                    Check(!drawer.Drawing&&!drawer.Robot.Crazed&&drawer.AngerLevel==5&&!game.Player.InCutscene,"Weapon out, they are furious again and the close-up ends");
                     // Employees can be knocked out (200 health), and the player is out at 0.
                     Check(Mathf.Approximately(OfficeEmployee.MaxHealth,200)&&Mathf.Approximately(WorkerController.MaxHealth,100),"Employees have 200 health, players 100");
                     Transform gun=rifleman.transform;
@@ -240,9 +274,9 @@ namespace TheElevator.Editor
                     victim.Damage(1000,victim.transform.position+Vector3.forward,0);Check(victim.Dead&&!victim.Chasing,"Employees can be knocked out");
                     Check(victim.Robot.Core&&!victim.Robot.Core.isKinematic,"A knocked-out employee goes ragdoll");
                     // Three armed employees per floor: two rifles (2% per offence once furious), one bazooka (1%).
-                    Check(OfficeEmployee.Draws(Arms.Rifle,.019)&&!OfficeEmployee.Draws(Arms.Rifle,.021)&&OfficeEmployee.Draws(Arms.Bazooka,.009)&&!OfficeEmployee.Draws(Arms.Bazooka,.011)&&!OfficeEmployee.Draws(Arms.None,0),"Weapon odds: 2% rifle, 1% bazooka, nobody else");
-                    Check(office.Employees.FindAll(e=>e.Sidearm==Arms.Rifle).Count==2&&office.Employees.FindAll(e=>e.Sidearm==Arms.Bazooka).Count==1,"Exactly two rifle carriers and one bazooka carrier per floor");
-                    Check(Mathf.Approximately(OfficeWeapons.RifleDamage,10)&&Mathf.Approximately(OfficeWeapons.BlastDamage,90)&&Mathf.Approximately(OfficeWeapons.PunchDamage,5),"Employee damage: rifle 10, bazooka 90, fist 5");
+                    Check(OfficeEmployee.Draws(Arms.Pistol,.019)&&!OfficeEmployee.Draws(Arms.Pistol,.021)&&OfficeEmployee.Draws(Arms.Bazooka,.009)&&!OfficeEmployee.Draws(Arms.Bazooka,.011)&&!OfficeEmployee.Draws(Arms.None,0),"Weapon odds: 2% rifle, 1% bazooka, nobody else");
+                    Check(office.Employees.FindAll(e=>e.Sidearm==Arms.Pistol).Count==2&&office.Employees.FindAll(e=>e.Sidearm==Arms.Bazooka).Count==1,"Exactly two rifle carriers and one bazooka carrier per floor");
+                    Check(Mathf.Approximately(OfficeWeapons.PistolDamage,24)&&Mathf.Approximately(OfficeWeapons.BlastDamage,90)&&Mathf.Approximately(OfficeWeapons.PunchDamage,5),"Employee damage: pistol 24, bazooka 90, fist 5");
                     // Chairs are solid to players (not to employees), and people at work stay solid too.
                     OfficeSeat chair=OfficeSeat.All.Find(s=>s&&s.GetComponent<BoxCollider>());
                     Check(chair&&chair.gameObject.layer==PhysicsLayers.Seats&&!Physics.GetIgnoreLayerCollision(PhysicsLayers.Player,PhysicsLayers.Seats)&&Physics.GetIgnoreLayerCollision(PhysicsLayers.Employees,PhysicsLayers.Seats),"Chairs block players but not employees");
@@ -255,8 +289,8 @@ namespace TheElevator.Editor
                     // Knocked out, armed employees drop their weapons for anyone to pick up.
                     rifleman.Damage(1000,rifleman.transform.position+Vector3.forward,0);rocketeer.Damage(1000,rocketeer.transform.position+Vector3.forward,0);
                     PlayerWeapon[] loose=UnityEngine.Object.FindObjectsByType<PlayerWeapon>(FindObjectsSortMode.None);
-                    Check(Array.Exists(loose,w=>w.Kind==Arms.Rifle&&w.GetComponent<SalvageItem>())&&Array.Exists(loose,w=>w.Kind==Arms.Bazooka&&w.GetComponent<SalvageItem>()),"Knocked-out employees drop their weapons as pickups");
-                    playerGun=Array.Find(loose,w=>w.Kind==Arms.Rifle);
+                    Check(Array.Exists(loose,w=>w.Kind==Arms.Pistol&&w.GetComponent<SalvageItem>())&&Array.Exists(loose,w=>w.Kind==Arms.Bazooka&&w.GetComponent<SalvageItem>()),"Knocked-out employees drop their weapons as pickups");
+                    playerGun=Array.Find(loose,w=>w.Kind==Arms.Pistol);
                     started=Time.time;stage=8;return;
                 }
                 if(stage==8)
@@ -323,18 +357,23 @@ namespace TheElevator.Editor
                     game.Player.HealForValidation();
                     if(Time.time-started<.2f)return;
                     playerGun.Operate(game.Player,true,true);
-                    Check(target.Dead,"One round from a player's rifle knocks an employee out");
-                    Check(playerGun.Ammo==OfficeWeapons.RifleMagazine-1,"The rifle uses a round per shot");
+                    Check(target.Dead,"One round from a player's pistol knocks an employee out");
+                    Check(playerGun.Ammo==OfficeWeapons.PistolMagazine-1,"The pistol uses a round per shot");
                     // A player's rocket blast is lethal across its radius.
                     OfficeEmployee far=office.Employees.Find(e=>!e.Dead&&Vector3.Distance(e.transform.position,game.Player.transform.position)>OfficeWeapons.BlastRadius+3);
                     OfficeWeapons.Explode(office,far.transform.position+Vector3.up*.5f,OfficeWeapons.PlayerBlastDamage);
                     Check(far.Dead,"A player's bazooka blast knocks out anyone in range");
                     game.Player.Drop(false);
+                    // The building's anger meter: full at 50, and then everyone is after the players.
+                    bool lounge=office.Plan.Rooms.Exists(r=>r.Kind==OfficeRoomKind.Lounge);int vending=Array.FindAll(office.GetComponentsInChildren<Transform>(true),t=>t.name=="Lounge vending machine").Length;
+                    office.SetAngerForValidation(49);office.AddAnger(1);
+                    Check(office.Riot&&office.Employees.TrueForAll(e=>e.Dead||e.Snapped),"A full meter turns the whole building against the players");
+                    office.AddAnger(-10);Check(office.Riot,"The meter never goes down");
                     game.Player.Teleport(brute.transform.position+brute.transform.forward*3);game.Player.HealForValidation();
                     game.Player.Damage(1000,game.Player.transform.position+Vector3.forward,0);
                     Check(game.Player.Down&&game.Phase==DescentGame.RunPhase.Lost,"With nobody left standing, being knocked out ends the shift");
                     Check(game.Player.Model.Ragdolled,"The player ragdolls too");
-                    Finish(true,"OFFICE INTERACTION PASS: visible first-person hands, multiple grip profiles, selected equipment only, nearby pickup, gentle tap, capped charged throw, weight scaling, charge cancellation, two-room meeting with presenter, calm meeting entry, one anger level per bump, shoving, extinguisher pickup/spray/charge/empty/push, hand clear of nozzle, sticky blinding foam and instant fury, chase, three voice tones, hallway chat, sit and stand, one phrase per bubble, owner-only desk theft (award 3, computer 5), thrown-item damage, cooling to 4 and never lower, snapping at 20, inaccurate rifle fire, punches, bazooka blast, knockouts, shift ends at 0 health, 2%/0.5% weapon odds, solid chairs and seated people, ragdolls, body carrying and pay shares.");
+                    Finish(true,"OFFICE INTERACTION PASS: visible first-person hands, multiple grip profiles, selected equipment only, nearby pickup, gentle tap, capped charged throw, weight scaling, charge cancellation, two-room meeting with presenter, calm meeting entry, one anger level per bump, shoving, extinguisher pickup/spray/charge/empty/push, hand clear of nozzle, sticky blinding foam and instant fury, chase, three voice tones, hallway chat, sit and stand, one phrase per bubble, owner-only desk theft (award 3, computer 5), thrown-item damage, cooling to 4 and never lower, snapping at 20, inaccurate rifle fire, punches, bazooka blast, knockouts, shift ends at 0 health, 2%/0.5% weapon odds, solid chairs and seated people, ragdolls, body carrying and pay shares, pistol aim delay and cadence, crazed weapon draw with close-up and gasps, first aid kits, blood-edge health, building anger meter and riot (lounge vending machines: "+vending+(lounge?"":" / no lounge on this seed")+").");
                 }
             }
             catch(Exception error){Finish(false,error.ToString());}

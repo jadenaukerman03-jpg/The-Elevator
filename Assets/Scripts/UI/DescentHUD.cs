@@ -76,7 +76,7 @@ namespace TheElevator
                 Text(new Rect(66, 61, 520, 24), "FACILITY SERVICES / EMPLOYEE INDUCTION 004", small);
                 Text(new Rect(62, 100, 535, 160), "THE\nELEVATOR", title);
                 Text(new Rect(66, 277, 505, 35), game.CurrentOffice ? "FLOOR 1 / MORROW SYSTEMS" : "Going down. Mostly.", heading);
-                Text(new Rect(66, 332, 500, 80), game.CurrentOffice ? "You are here to steal office equipment. Find the reception access card, open the secured room, and bring the required asset back to the elevator." : game.UseProceduralFloors ? "A sprawling facility. One freight lift. Find remote survey stations, recover valuables, and remember your way back." : "Three floors. One freight lift. Grab whatever looks expensive and get back before the doors close.", body);
+                Text(new Rect(66, 332, 500, 80), game.CurrentOffice ? "You are here to steal office equipment. Find the one employee carrying the access card, use it on the locked door, and bring the asset behind it back to the elevator." : game.UseProceduralFloors ? "A sprawling facility. One freight lift. Find remote survey stations, recover valuables, and remember your way back." : "Three floors. One freight lift. Grab whatever looks expensive and get back before the doors close.", body);
                 Text(new Rect(66, 422, 500, 58), game.CurrentOffice ? "Your field notebook is on the table inside the elevator. Read it for controls, access and floor selection." : "Batteries keep you moving. Heavy cargo slows the doors and burns extra power. You count toward the weight limit.", body);
                 if (Button(new Rect(66, 502, 500, 42), "SETTINGS  /  CUSTOMIZE AVATAR", Workshop.Cream)) settings = true;
                 if (Button(new Rect(66, 558, 500, 56), "CLOCK IN  /  START DESCENT", Workshop.Yellow)) game.Begin();
@@ -105,6 +105,14 @@ namespace TheElevator
                 "DEPARTS " + (secondsLeft / 60).ToString("00") + ":" + (secondsLeft % 60).ToString("00");
             Text(new Rect(width - 263, 38, 225, 35), clock, heading);
             Text(new Rect(width - 263, 82, 230, 22), "RECOVERED   $" + game.CargoValue, body);
+            if (game.CurrentOffice)
+            {
+                // Building-wide anger: fills with every offence, never goes down; full means everyone is after you.
+                TheElevator.Office.OfficeFloor office = game.CurrentOffice;
+                Panel(new Rect(width - 280, 136, 256, 52), new Color(0.025f, 0.055f, 0.065f, 0.92f));
+                Text(new Rect(width - 263, 143, 230, 20), office.Riot ? "OFFICE ANGER  /  EVERYONE IS AFTER YOU" : "OFFICE ANGER  " + Mathf.FloorToInt(office.BuildingAnger) + " / " + Mathf.RoundToInt(TheElevator.Office.OfficeFloor.RiotPoint), small);
+                Bar(new Rect(width - 263, 170, 220, 6), office.BuildingAnger / TheElevator.Office.OfficeFloor.RiotPoint, office.BuildingAnger > 35 ? Workshop.Red : Workshop.Yellow);
+            }
             if (game.Phase == DescentGame.RunPhase.Closing)
                 Bar(new Rect(width - 263, 118, 220, 4), 1 - game.ClosingProgress, Workshop.Red);
 

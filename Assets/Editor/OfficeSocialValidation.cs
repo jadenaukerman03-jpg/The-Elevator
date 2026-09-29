@@ -104,7 +104,7 @@ namespace TheElevator.Editor
                             }
                             desk|=plan.DeskBadge;person|=!plan.DeskBadge;
                         }
-                        Check(meetings>=20,"Most floors have a two-room meeting room");Check(desk&&person,"Desk and person badge variants exist");
+                        Check(meetings>=20,"Most floors have a two-room meeting room");Check(person&&!desk,"Every floor's access card is carried by an employee");
                         game.Player.Teleport(new Vector3(0,.08f,-6.5f));game.RegenerateMap(104728,MapSize.Small,false);stage=3;return;
                     }
                     Check(Time.time-started<160,"Coffee employee did not return home / "+traveller.State);
@@ -112,9 +112,11 @@ namespace TheElevator.Editor
                 if(stage==3)
                 {
                     if(game.Phase==DescentGame.RunPhase.Generating||game.ActiveSeed!=104728)return;
-                    Check(office.DeskKeycard&&!office.Employees[0].HasBadge,"Visible desk keycard replaces supervisor pocket badge");
-                    office.DeskKeycard.Take();Check(office.BadgeLevel==2&&office.DeskKeycard.Taken,"Desk keycard pickup grants access");
-                    Finish(true,"OFFICE SOCIAL PASS: sparse common areas, reserved homes, independent schedules, crouch/headroom, toggle doors, occupied-computer reaction, suspicion meter, physical coffee trip/fill/drink/return, seeded meetings and both badge variants.");
+                    Check(!office.DeskKeycard&&office.KeycardHolder&&office.KeycardHolder.HasBadge,"The supervisor carries the access card; none on a desk");
+                    office.KeycardHolder.Damage(1000,office.KeycardHolder.transform.position+Vector3.forward,0);
+                    Check(office.DeskKeycard&&!office.KeycardHolder.HasBadge,"Knocked out, the holder drops the card");
+                    office.DeskKeycard.Take();Check(office.BadgeLevel==2&&office.DeskKeycard.Taken,"Picking up the dropped card grants access");
+                    Finish(true,"OFFICE SOCIAL PASS: sparse common areas, reserved homes, independent schedules, crouch/headroom, toggle doors, occupied-computer reaction, suspicion meter, physical coffee trip/fill/drink/return, seeded meetings, employee-carried access card dropped on knockout.");
                 }
             }
             catch(Exception e){Finish(false,e.ToString());}

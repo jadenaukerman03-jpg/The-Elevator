@@ -15,6 +15,8 @@ namespace TheElevator.Office
 
         // Where wall-mounted fire extinguishers hang; OfficeFloor turns each into a pickup.
         public readonly List<Transform> ExtinguisherMounts = new List<Transform>();
+        // Where wall-mounted first aid kits hang (one room in fifty).
+        public readonly List<Transform> FirstAidMounts = new List<Transform>();
 
         Edge[] Edges(MapRoom room)
         {
@@ -122,6 +124,7 @@ namespace TheElevator.Office
             // Open offices get a kitchenette on a second wall when they span several cells.
             if (info.Kind == OfficeRoomKind.Workroom && zone.Rooms.Count > 1 && zone.Rooms[zone.Rooms.Count - 1] == room.Id)
                 foreach (int side in walls) if (!usedWalls.Contains(side)) { Kitchen(WallGroup(geometry, side, "Kitchenette", 5.0f), room.Id); usedWalls.Add(side); break; }
+            bool loungeVending = false;
             // Remaining solid walls get something that belongs in the room; tall pieces take the wall, low ones leave room for a display above.
             foreach (int side in walls)
             {
@@ -136,7 +139,11 @@ namespace TheElevator.Office
                         Transform racks = WallGroup(geometry, side, "Wall racks", 5.2f);
                         for (int r = -1; r <= 1; r += 2) Server(A.Group(racks, "Rack", new Vector3(r * .6f,0,0)));
                         usedWalls.Add(side); break;
-                    case OfficeRoomKind.Lounge: Lounge(WallGroup(geometry, side, "Wall sofa", 5.2f)); break;
+                    case OfficeRoomKind.Lounge:
+                        // Every lounge has a vending machine on its first free wall; other walls get a sofa.
+                        if (!loungeVending) { Vending(WallGroup(geometry, side, "Lounge vending machine", 5.36f)); loungeVending = true; usedWalls.Add(side); }
+                        else Lounge(WallGroup(geometry, side, "Wall sofa", 5.2f));
+                        break;
                     case OfficeRoomKind.Breakroom: Fridge(WallGroup(geometry, side, "Fridge", 5.45f)); usedWalls.Add(side); break;
                     case OfficeRoomKind.Executive: Credenza(WallGroup(geometry, side, "Credenza", 5.55f)); break;
                     case OfficeRoomKind.Restroom: Washroom(WallGroup(geometry, side, "Washbasins", 5.0f)); usedWalls.Add(side); break;
@@ -154,6 +161,9 @@ namespace TheElevator.Office
             // One room in four keeps a fire extinguisher on a wall bracket; the extinguisher itself is a pickup.
             if (new System.Random(unchecked(floor.Manifest.Recipe.Seed * 7349 + room.Id * 104729)).NextDouble() < .25)
                 ExtinguisherBracket(A.Group(first, "Fire extinguisher point", new Vector3(2.55f,0,5.74f)));
+            // Rarely, a first aid kit on the same wall, below the clock.
+            if (new System.Random(unchecked(floor.Manifest.Recipe.Seed * 6151 + room.Id * 7907)).NextDouble() < FirstAidKit.SpawnChance)
+                FirstAidBracket(A.Group(first, "First aid point", new Vector3(-2.55f,0,5.74f)));
             foreach (int side in walls)
             {
                 if (usedWalls.Contains(side)) continue;
@@ -305,6 +315,14 @@ namespace TheElevator.Office
             A.Box(point, "Extinguisher cradle", new Vector3(0,.72f,-.1f), new Vector3(.24f,.04f,.14f), A.Metal);
             A.Box(point, "Extinguisher strap", new Vector3(0,1.14f,-.1f), new Vector3(.26f,.035f,.14f), A.Metal);
             ExtinguisherMounts.Add(A.Group(point, "Extinguisher mount", new Vector3(0,.74f,-.16f)));
+        }
+
+        // A small white plate with a shelf; the kit that sits on it is spawned by the floor at FirstAidMounts.
+        void FirstAidBracket(Transform point)
+        {
+            A.Box(point, "First aid backing plate", new Vector3(0,1.08f,-.03f), new Vector3(.42f,.36f,.04f), A.Paper);
+            A.Box(point, "First aid shelf", new Vector3(0,.93f,-.09f), new Vector3(.38f,.03f,.12f), A.Metal);
+            FirstAidMounts.Add(A.Group(point, "First aid mount", new Vector3(0,.945f,-.11f)));
         }
 
         void CorporateDisplay(Transform wall, int room)

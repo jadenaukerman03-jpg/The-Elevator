@@ -8,13 +8,15 @@ namespace TheElevator.Office
     // past 5. A bump adds 1. Taking an award or another thing off their desk puts them at 3 at least; taking their
     // computer, throwing something at them or foaming them puts them at 5 at least; repeating those adds 2 or 5 more.
     // Anger never cools on its own, with one exception: a furious employee who loses sight of the player for a while
-    // settles to 4 (on edge). Three employees per floor keep a weapon in their desk (their Sidearm): two a rifle,
-    // one a bazooka. Once one of them is furious, every further offence is a 2% chance (rifle) or 1% chance (bazooka)
-    // they pull it, and then they hunt the player. At 20 anyone snaps: they hunt the player for good and swing at them.
+    // settles to 4 (on edge). Three employees per floor keep a weapon in their desk (their Sidearm): two a pistol,
+    // one a bazooka. Once one of them is furious, every further offence is a 2% chance (pistol) or 1% chance (bazooka)
+    // they pull it: slowly, pale and wild-eyed, while everyone who sees it gasps. Then they hunt the player.
+    // At 20 anyone snaps: they hunt the player for good and swing at them. Every point of anger an offence adds
+    // also fills the building-wide meter (OfficeFloor.BuildingAnger).
     public sealed partial class OfficeEmployee
     {
-        public const float SnapPoint = 20, MaxHealth = 200, LoseInterest = 10, RifleChance = .02f, BazookaChance = .01f;
-        // The weapon kept in this employee's desk, if any (assigned by the floor: two rifles and one bazooka).
+        public const float SnapPoint = 20, MaxHealth = 200, LoseInterest = 10, PistolChance = .02f, BazookaChance = .01f;
+        // The weapon kept in this employee's desk, if any (assigned by the floor: two pistols and one bazooka).
         public Arms Sidearm;
         public float Anger { get; private set; } = 1;
         public int AngerLevel { get { return Mathf.Clamp((int)Anger, 1, 5); } }
@@ -24,9 +26,9 @@ namespace TheElevator.Office
         public bool Dead { get; private set; }
         public Arms Weapon { get; private set; }
         string lastLine;
-        float lastSawPlayer = -999, lastFoamOffence = -10, nextSpotted, nextSwing, nextShot, swingUntil;
+        float lastSawPlayer = -999, lastFoamOffence = -10, nextSpotted, nextSwing, nextShot, swingUntil, sightSince = -1;
+        int clip = OfficeWeapons.PistolClip;
         Vector3 lastHit;
-        int burst;
         Transform weapon;
         bool armsBusy;
 
@@ -56,8 +58,10 @@ namespace TheElevator.Office
             if (Dead) return;
             OfficeDialogue.Tier before = OfficeDialogue.TierFor(Anger);
             bool wasSnapped = Snapped, wasFurious = AngerLevel >= 5;
-            float minimum = Minimum(grievance);
+            float minimum = Minimum(grievance), angerBefore = Anger;
             Anger = Anger < minimum ? minimum : Anger + Weight(grievance);
+            // What this offence added also counts toward the whole building's anger.
+            Office.AddAnger(Anger - angerBefore);
             Complaint = grievance;
             attentionUntil = Time.time + 5;
             SawPlayer();
@@ -66,20 +70,45 @@ namespace TheElevator.Office
             if (wasFurious && Weapon == Arms.None && Office.Game)
             {
                 Arms drawn = Draws(Sidearm, random.NextDouble()) ? Sidearm : Arms.None;
-                if (drawn != Arms.None)
-                {
-                    // Armed means out for revenge: they hunt the player and never calm down.
-                    Anger = Mathf.Max(Anger, SnapPoint);
-                    Arm(drawn);
-                    Say(OfficeDialogue.Pick(drawn == Arms.Bazooka ? OfficeDialogue.DrawBazooka : OfficeDialogue.DrawRifle, random, ref lastLine));
-                    return;
-                }
+                if (drawn != Arms.None) { BeginDraw(drawn); return; }
             }
             if (opening != null) Say(opening);
             else if (!Speaking || OfficeDialogue.TierFor(Anger) != before || (Snapped && !wasSnapped)) Say(OfficeDialogue.Reaction(grievance, Anger, random, ref lastLine));
         }
 
-        public static bool Draws(Arms sidearm, double roll) { return roll < (sidearm == Arms.Rifle ? RifleChance : sidearm == Arms.Bazooka ? BazookaChance : 0); }
+        // ---- Drawing a weapon: slow, pale and wild-eyed; then back to furious and shooting ----
+        public const float DrawTime = 2.4f;
+        float drawStart = -10;
+        public bool Drawing { get { return Time.time < drawStart + DrawTime; } }
+        void BeginDraw(Arms drawn)
+        {
+            // Armed means out for revenge: they hunt the player and never calm down.
+            Anger = Mathf.Max(Anger, SnapPoint);
+            Arm(drawn);
+            drawStart = Time.time; nextShot = Time.time + DrawTime; sightSince = -1;
+            route.Clear(); Robot.Crazed = true;
+            Say(OfficeDialogue.Pick(drawn == Arms.Bazooka ? OfficeDialogue.DrawBazooka : OfficeDialogue.DrawPistol, random, ref lastLine));
+            Office.WeaponDrawn(this);
+        }
+        public void DrawForValidation(Arms arms) { BeginDraw(arms); }
+
+        // Seeing a coworker pull a weapon.
+        public void Gasp(bool bazooka)
+        {
+            if (Dead) return;
+            attentionUntil = Time.time + 3;
+            Say(OfficeDialogue.Pick(bazooka ? OfficeDialogue.GaspsBazooka : OfficeDialogue.Gasps, random, ref lastLine));
+        }
+
+        // The building's anger meter is full: everyone turns on the player, for good.
+        public void JoinRiot(bool shout)
+        {
+            if (Dead) return;
+            Anger = Mathf.Max(Anger, SnapPoint); SawPlayer();
+            if (shout) Say(OfficeDialogue.Pick(OfficeDialogue.Riot, random, ref lastLine));
+        }
+
+        public static bool Draws(Arms sidearm, double roll) { return roll < (sidearm == Arms.Pistol ? PistolChance : sidearm == Arms.Bazooka ? BazookaChance : 0); }
 
         public void Bump() { Offend(Grievance.Bump); }
 
@@ -131,7 +160,7 @@ namespace TheElevator.Office
             if (voice) voice.Stop();
             motor.enabled = false;
             // Limp: no typing or reaching pose left in the arms.
-            Robot.Seated = false; Robot.Reaching = false; Robot.Talking = false; Robot.Speed = 0; Robot.Activity = OfficeTask.Reading;
+            Robot.Seated = false; Robot.Reaching = false; Robot.Talking = false; Robot.Speed = 0; Robot.Activity = OfficeTask.Reading; Robot.Crazed = false;
             if (weapon)
             {
                 // The weapon clatters to the floor, and anyone can pick it up.
@@ -140,6 +169,8 @@ namespace TheElevator.Office
                 weapon = null; Weapon = Arms.None;
             }
             if (Cup) { Destroy(Cup.gameObject); Cup = null; }
+            // The access card holder drops the card where they fall.
+            if (HasBadge && Supervisor && Office.Game) { HasBadge = false; Office.DropKeycard(transform.position + Vector3.up * .05f + transform.forward * .4f, transform.rotation); }
             // Limp: the body falls wherever physics takes it and stays there.
             Robot.Ragdoll(lastHit + Vector3.up * 1.2f);
         }
@@ -169,7 +200,7 @@ namespace TheElevator.Office
             if (weapon) Destroy(weapon.gameObject);
             Weapon = arms;
             weapon = arms == Arms.None ? null : OfficeWeapons.Build(arms, Office.Kit.A, Office.transform);
-            nextShot = Time.time + 1;
+            nextShot = Time.time + 1; sightSince = -1; clip = OfficeWeapons.PistolClip;
         }
 
         // Weapons ride in the right hand, pointed at the player while aiming.
@@ -208,13 +239,25 @@ namespace TheElevator.Office
             State = Snapped ? "Out for revenge" : "Confronting the intruder";
             attentionUntil = Mathf.Max(attentionUntil, Time.time + .5f);
             Vector3 target = Snapped || Time.time - lastSawPlayer < 1 ? player.transform.position : LastObservedPosition;
+            if (Drawing)
+            {
+                // Pulling the weapon out, slowly, facing the player; the arm rises from the hip to aim.
+                route.Clear(); Robot.Seated = false;
+                Vector3 toward = player.transform.position - transform.position; toward.y = 0;
+                if (toward.sqrMagnitude > .01f) transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(toward), 200 * Time.deltaTime);
+                float t = Mathf.SmoothStep(0, 1, (Time.time - drawStart) / DrawTime);
+                Robot.Reaching = true; armsBusy = true;
+                Robot.ReachTarget = Vector3.Lerp(transform.position + Vector3.up * .75f + transform.forward * .25f + transform.right * .2f, player.transform.position + Vector3.up * 1.1f, t);
+                return;
+            }
+            if (Robot.Crazed) Robot.Crazed = false;
             if (!Speaking && Time.time >= nextRant)
                 Say(Snapped && Weapon != Arms.None && random.NextDouble() < .5 ? OfficeDialogue.Pick(OfficeDialogue.Firing, random, ref lastLine) : OfficeDialogue.Rant(Complaint, Anger, random, ref lastLine));
             if (Blinded || Pushed) return;
             Vector3 chest = player.transform.position + Vector3.up * 1.1f;
             bool clear = !Physics.Linecast(transform.position + Vector3.up * 1.3f, chest, ~((1 << 2) | (1 << 8)), QueryTriggerInteraction.Ignore);
             if (Snapped) Attack(player, distance, clear, chest);
-            float keep = Weapon == Arms.Rifle ? 7 : Weapon == Arms.Bazooka ? 9 : Snapped ? 1.1f : 1.5f;
+            float keep = Weapon == Arms.Pistol ? 7 : Weapon == Arms.Bazooka ? 9 : Snapped ? 1.1f : 1.5f;
             if (distance <= keep && (clear || Weapon == Arms.None))
             {
                 route.Clear(); Robot.Seated = false;
@@ -222,8 +265,9 @@ namespace TheElevator.Office
                 if (toward.sqrMagnitude > .01f) transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(toward), 300 * Time.deltaTime);
                 return;
             }
-            if (Time.time < nextChasePlan) return;
-            nextChasePlan = Time.time + 1.2f;
+            if (Time.time < nextChasePlan || !Office.TryPlanChase()) return;
+            // Far away, replan less often (a whole building can be chasing at once).
+            nextChasePlan = Time.time + 1.2f + (float)random.NextDouble() * .6f + distance * .05f;
             if (OfficeNavigation.Build(this, Office.Map.NearestRoom(target).Id, target, chaseRoute)) { route.Clear(); route.AddRange(chaseRoute); bestWaypointDistance = float.MaxValue; }
         }
 
@@ -247,14 +291,19 @@ namespace TheElevator.Office
                 return;
             }
             Transform muzzle = OfficeWeapons.Muzzle(weapon);
+            // Out of sight: the aiming clock starts over.
+            if (!aiming) sightSince = -1;
             if (!aiming || !muzzle || Time.time < nextShot) return;
-            if (Weapon == Arms.Rifle)
+            if (Weapon == Arms.Pistol)
             {
-                // Short bursts with pauses in between.
-                if (burst <= 0) burst = 3 + random.Next(3);
-                OfficeWeapons.FireRifle(muzzle.position, chest, player, random);
-                burst--;
-                nextShot = Time.time + (burst > 0 ? .11f : 1.1f + (float)random.NextDouble() * 1.1f);
+                // Aim for two seconds of the player in plain sight before the first shot; one shot a second after
+                // that; reload after six.
+                if (sightSince < 0) sightSince = Time.time;
+                if (Time.time - sightSince < OfficeWeapons.AimDelay) return;
+                OfficeWeapons.FirePistol(muzzle.position, chest, player, random);
+                clip--;
+                if (clip > 0) nextShot = Time.time + OfficeWeapons.PistolInterval;
+                else { clip = OfficeWeapons.PistolClip; nextShot = Time.time + OfficeWeapons.ReloadTime; if (!Speaking) Say("Reloading!"); }
             }
             else if (distance > 5)
             {
